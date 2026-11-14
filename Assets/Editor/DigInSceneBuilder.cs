@@ -31,6 +31,7 @@ public static partial class DigInSceneBuilder
     const string MeshDir = "Assets/Meshes";
     const string PrefabDir = "Assets/Prefabs";
     const string MemoryDir = "Assets/Data/Memories";
+    const string LetterDir = "Assets/Data/Letters";
     const string FontDir = "Assets/Fonts";
     const string TerrainDir = "Assets/Terrain";
     const string KenneyDir = "Assets/ThirdParty/Kenney";
@@ -41,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
-    const string HudVersion = "v2 memory card";
+    const string HudVersion = "v3 letters";
 
     static readonly Color[] StrataColors =
     {
@@ -66,10 +67,11 @@ public static partial class DigInSceneBuilder
         report = new StringBuilder("DigIn/Build Scene\n");
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
-        foreach (var dir in new[] { MatDir, TexDir, MeshDir, PrefabDir, MemoryDir, FontDir, TerrainDir }) EnsureFolder(dir);
+        foreach (var dir in new[] { MatDir, TexDir, MeshDir, PrefabDir, MemoryDir, LetterDir, FontDir, TerrainDir }) EnsureFolder(dir);
 
         var m = BuildMaterials();
         var memories = BuildMemories();
+        var letters = BuildLetters();
         var font = BuildFont("Lora-Regular");
         var italic = BuildFont("Lora-Italic");
         var wallMesh = LoadOrCreate(MeshDir + "/ShaftWalls.asset", DigTerrain.BuildWallMesh);
@@ -103,7 +105,7 @@ public static partial class DigInSceneBuilder
             }
         }
 
-        WireGame(scene, memories, findPrefab);
+        WireGame(scene, memories, letters, findPrefab);
         DeleteUnusedAssets();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -250,6 +252,49 @@ public static partial class DigInSceneBuilder
             });
         }
         return result;
+    }
+
+    // Letters 1-3 (one per stratum) and the ending, one line per sentence.
+    static LetterData[] BuildLetters()
+    {
+        var defs = new (string file, string title, string[] lines)[]
+        {
+            ("1 Childhood", "Childhood", new[]
+            {
+                "I used to think afternoons lasted forever.",
+                "The floor was a road, a cardboard box was a spaceship, and someone always called me in when it got dark.",
+                "I don't remember what we had for dinner.",
+                "I remember wanting five more minutes outside.",
+            }),
+            ("2 School Days", "School Days", new[]
+            {
+                "I spent so much time waiting for the next thing.",
+                "The next bell, the next weekend, the next exam to be over.",
+                "Somewhere between all that waiting, we laughed at things that weren't even funny.",
+                "I wonder if the others remember them too.",
+            }),
+            ("3 Growing Up", "Growing Up", new[]
+            {
+                "My days became full of things I had to finish.",
+                "There were messages to answer, places to be, and plans that kept changing.",
+                "Sometimes I missed a call and forgot to call back.",
+                "I thought I'd have more time later.",
+            }),
+            ("4 Ending - The Blank Page", "", new[]
+            {
+                "There was nothing written on the last page.",
+                "Not because nothing happened today.",
+                "But because today isn't over yet.",
+                "Someday, this ordinary day might be something worth digging up.",
+            }),
+        };
+        return defs.Select(d => LoadOrCreate(LetterDir + "/" + d.file + ".asset", () =>
+        {
+            var letter = ScriptableObject.CreateInstance<LetterData>();
+            letter.title = d.title;
+            letter.lines = d.lines;
+            return letter;
+        })).ToArray();
     }
 
     // A TMP font asset made from Assets/Fonts/<fileName>.ttf, or TMP's default font if
@@ -592,6 +637,7 @@ public static partial class DigInSceneBuilder
         c.characterSpacing = 2f;
 
         BuildCardUi(root.transform, hud, font, italic);
+        BuildLetterUi(root.transform, hud, font, italic);
         return SavePrefab(root, path);
     }
 
@@ -630,6 +676,42 @@ public static partial class DigInSceneBuilder
         var t = Text("Text", node, font, font.material, size, align, text, Vector2.zero, box, stretch: true);
         t.color = new Color(InkColor.r, InkColor.g, InkColor.b, alpha);
         return t;
+    }
+
+    // A letter: a sheet of paper over a dark backdrop; its lines fade in one by one.
+    static void BuildLetterUi(Transform root, DigHud hud, TMP_FontAsset font, TMP_FontAsset italic)
+    {
+        var p = hud.letter;
+        p.group = Overlay("Letter", root, new Color(0.04f, 0.03f, 0.02f, 0.82f));
+        var paper = Paper("Paper", p.group.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920f, 860f));
+
+        var top = new Vector2(0.5f, 1f);
+        p.title = Ink("Title", paper.transform, font, 26f, TextAlignmentOptions.Center, "<smallcaps>Childhood</smallcaps>",
+            top, new Vector2(0f, -56f), new Vector2(760f, 40f), 0.6f);
+        p.title.fontStyle = FontStyles.SmallCaps;
+        p.title.characterSpacing = 6f;
+
+        var body = UiNode("Lines", paper.transform, top, top, new Vector2(0f, -130f), new Vector2(760f, 620f));
+        var layout = body.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 26f;
+        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        p.lines = new TMP_Text[6];
+        for (int i = 0; i < p.lines.Length; i++)
+        {
+            var t = Text("Line " + (i + 1), body, italic, italic.material, 34f, TextAlignmentOptions.TopLeft,
+                "A line of the letter.", Vector2.zero, new Vector2(760f, 50f));
+            t.color = InkColor;
+            t.lineSpacing = 8f;
+        }
+        p.lines = body.GetComponentsInChildren<TMP_Text>(true);
+
+        p.hint = Ink("Hint", paper.transform, font, 20f, TextAlignmentOptions.Center, "Click to continue",
+            new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(760f, 34f), 0.5f);
     }
 
     // Memory card: name, illustration area, the one-line memory.
@@ -813,7 +895,7 @@ public static partial class DigInSceneBuilder
         Lantern(leanTo, BenchPos + new Vector3(1.4f, 0f, 1.6f), 2.1f);
     }
 
-    static void WireGame(Scene scene, MemoryData[] memories, GameObject findPrefab)
+    static void WireGame(Scene scene, MemoryData[] memories, LetterData[] letters, GameObject findPrefab)
     {
         var gameRoot = Root(scene, "Game", out _);
         // Not "??": Unity's fake-null objects defeat it.
@@ -841,6 +923,7 @@ public static partial class DigInSceneBuilder
 
         if (story.game == null) story.game = game;
         if (story.hud == null) story.hud = game.hud;
+        if (story.letters == null || story.letters.Length == 0) story.letters = letters.Take(3).ToArray();
         EditorUtility.SetDirty(story);
 
         if (atmosphere.viewer == null && player != null) atmosphere.viewer = player.cam;

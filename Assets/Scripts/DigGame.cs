@@ -134,6 +134,19 @@ public class DigGame : MonoBehaviour
         }
     }
 
+    // True when all memories of a stratum have been picked up.
+    public bool StratumComplete(int stratum)
+    {
+        bool any = false;
+        for (int i = 0; i < memories.Length; i++)
+        {
+            if (memories[i] == null || memories[i].stratum != stratum) continue;
+            if (!found[i]) return false;
+            any = true;
+        }
+        return any;
+    }
+
     // Picks up a found object if the ray points at one. Returns true if it did.
     public bool TryPickUp(Ray ray, float reach)
     {

@@ -38,6 +38,21 @@ public class DigHud : MonoBehaviour
         new Color(0.78f, 0.78f, 0.80f),
     };
 
+    // A full-screen panel whose lines fade in one by one (letters, the ending).
+    [System.Serializable]
+    public class LinePanel
+    {
+        public CanvasGroup group;
+        public TMP_Text title;
+        public TMP_Text[] lines;
+        public TMP_Text hint;
+        [System.NonSerialized] public bool visible;
+        [System.NonSerialized] public int count;
+    }
+
+    [Header("Letters")]
+    public LinePanel letter = new LinePanel();
+
     public float fadeSpeed = 3f;
 
     Color scrapBaseColor;
@@ -54,6 +69,7 @@ public class DigHud : MonoBehaviour
         if (messageGroup != null) messageGroup.alpha = 0f;
         if (controlsGroup != null) controlsGroup.alpha = 1f;
         if (cardGroup != null) cardGroup.alpha = 0f;
+        if (letter.group != null) letter.group.alpha = 0f;
     }
 
     // upgradeCost < 0 means there is nothing left to upgrade to.
@@ -104,6 +120,41 @@ public class DigHud : MonoBehaviour
         cardVisible = false;
     }
 
+    public void OpenLines(LinePanel panel, string title, string[] text)
+    {
+        panel.visible = true;
+        panel.count = Mathf.Min(text.Length, panel.lines.Length);
+        if (panel.title != null)
+        {
+            panel.title.text = title ?? "";
+            panel.title.gameObject.SetActive(!string.IsNullOrEmpty(title));
+        }
+        for (int i = 0; i < panel.lines.Length; i++)
+        {
+            bool used = i < panel.count;
+            panel.lines[i].gameObject.SetActive(used);
+            panel.lines[i].text = used ? text[i] : "";
+            panel.lines[i].alpha = 0f;
+        }
+        if (panel.hint != null) panel.hint.alpha = 0f;
+        messageTimer = 0f;
+    }
+
+    // Shows the lines as of `t` seconds after opening. Returns true once all are fully in.
+    public bool RevealLines(LinePanel panel, float t, float delay, float interval, float fade)
+    {
+        for (int i = 0; i < panel.count; i++)
+            panel.lines[i].alpha = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - delay - i * interval) / fade));
+        float end = delay + (panel.count - 1) * interval + fade;
+        if (panel.hint != null) panel.hint.alpha = 0.5f * Mathf.Clamp01((t - end - 0.5f) / 0.8f);
+        return t >= end;
+    }
+
+    public void CloseLines(LinePanel panel)
+    {
+        panel.visible = false;
+    }
+
     void Update()
     {
         float dt = Time.deltaTime;
@@ -114,6 +165,7 @@ public class DigHud : MonoBehaviour
         Fade(promptGroup, promptVisible);
         Fade(controlsGroup, time < controlsSeconds, 0.5f);
         Fade(cardGroup, cardVisible, 1.5f);
+        Fade(letter.group, letter.visible, 0.6f);
         if (cardPanel != null && cardVisible)
             cardPanel.localScale = Vector3.one * Mathf.MoveTowards(cardPanel.localScale.x, 1f, dt * 0.5f);
 
