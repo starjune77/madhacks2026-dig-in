@@ -53,6 +53,11 @@ public class DigHud : MonoBehaviour
     [Header("Letters")]
     public LinePanel letter = new LinePanel();
 
+    [Header("Ending")]
+    public LinePanel ending = new LinePanel();
+    [Tooltip("Full-screen black, for fading out and back in.")]
+    public CanvasGroup fadeGroup;
+
     public float fadeSpeed = 3f;
 
     Color scrapBaseColor;
@@ -70,6 +75,14 @@ public class DigHud : MonoBehaviour
         if (controlsGroup != null) controlsGroup.alpha = 1f;
         if (cardGroup != null) cardGroup.alpha = 0f;
         if (letter.group != null) letter.group.alpha = 0f;
+        if (ending.group != null) ending.group.alpha = 0f;
+        if (fadeGroup != null) fadeGroup.alpha = 0f;
+    }
+
+    // 0 = clear, 1 = black.
+    public void SetFade(float alpha)
+    {
+        if (fadeGroup != null) fadeGroup.alpha = alpha;
     }
 
     // upgradeCost < 0 means there is nothing left to upgrade to.
@@ -166,6 +179,7 @@ public class DigHud : MonoBehaviour
         Fade(controlsGroup, time < controlsSeconds, 0.5f);
         Fade(cardGroup, cardVisible, 1.5f);
         Fade(letter.group, letter.visible, 0.6f);
+        Fade(ending.group, ending.visible, 0.35f);
         if (cardPanel != null && cardVisible)
             cardPanel.localScale = Vector3.one * Mathf.MoveTowards(cardPanel.localScale.x, 1f, dt * 0.5f);
 

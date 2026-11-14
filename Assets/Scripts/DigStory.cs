@@ -1,9 +1,9 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// The story layer on top of digging: memory cards, and a letter after the last memory
-// of each stratum. Sits on "Game" next to DigGame. While anything is open, the player
-// cannot move or dig.
+// The story layer on top of digging: memory cards, a letter after the last memory of
+// each stratum, and the ending. Sits on "Game" next to DigGame. While anything is open,
+// the player cannot move or dig.
 public class DigStory : MonoBehaviour
 {
     public DigGame game;
@@ -11,6 +11,16 @@ public class DigStory : MonoBehaviour
 
     [Tooltip("One per stratum: Childhood, School Days, Growing Up.")]
     public LetterData[] letters;
+
+    [Tooltip("The words under the blank page.")]
+    public LetterData ending;
+
+    [Header("Ending pacing (seconds)")]
+    public float endingInterval = 2.8f;
+    public float endingHold = 4f;
+    public float fadeOut = 1.8f;
+    public float blackHold = 1.2f;
+    public float fadeIn = 2.5f;
 
     [Tooltip("Seconds an overlay ignores input after opening, so the click that opened it does not close it.")]
     public float inputGrace = 0.35f;
@@ -20,7 +30,10 @@ public class DigStory : MonoBehaviour
     public float lineInterval = 2.2f;
     public float lineFade = 1.4f;
 
-    enum Mode { None, Card, Letter }
+    enum Mode { None, Card, Letter, Ending }
+    enum EndingPhase { Words, FadeOut, Black, FadeIn }
+    EndingPhase phase;
+    float phaseTime;
     Mode mode;
     float openedAt;
     int unlockFrame;
@@ -50,6 +63,56 @@ public class DigStory : MonoBehaviour
         Open(Mode.Letter);
     }
 
+    public void PlayEnding()
+    {
+        hud.HideCard();
+        hud.CloseLines(hud.letter);
+        hud.OpenLines(hud.ending, "", ending != null ? ending.lines : new string[0]);
+        revealTime = 0f;
+        revealDone = false;
+        phase = EndingPhase.Words;
+        phaseTime = 0f;
+        Open(Mode.Ending);
+    }
+
+    void UpdateEnding()
+    {
+        phaseTime += Time.deltaTime;
+        switch (phase)
+        {
+            case EndingPhase.Words:
+                revealTime += Time.deltaTime;
+                bool wasDone = revealDone;
+                revealDone = hud.RevealLines(hud.ending, revealTime, lineDelay + 1.5f, endingInterval, lineFade + 0.6f);
+                if (revealDone && !wasDone) phaseTime = 0f;
+                if (revealDone && phaseTime >= endingHold) Next(EndingPhase.FadeOut);
+                break;
+            case EndingPhase.FadeOut:
+                hud.SetFade(Mathf.Clamp01(phaseTime / fadeOut));
+                if (phaseTime >= fadeOut)
+                {
+                    hud.CloseLines(hud.ending);
+                    game.FinishEnding();
+                    Next(EndingPhase.Black);
+                }
+                break;
+            case EndingPhase.Black:
+                hud.SetFade(1f);
+                if (phaseTime >= blackHold) Next(EndingPhase.FadeIn);
+                break;
+            case EndingPhase.FadeIn:
+                hud.SetFade(1f - Mathf.Clamp01(phaseTime / fadeIn));
+                if (phaseTime >= fadeIn) Close();
+                break;
+        }
+    }
+
+    void Next(EndingPhase p)
+    {
+        phase = p;
+        phaseTime = 0f;
+    }
+
     void Open(Mode m)
     {
         mode = m;
@@ -68,6 +131,15 @@ public class DigStory : MonoBehaviour
         {
             revealTime += Time.deltaTime;
             revealDone = hud.RevealLines(hud.letter, revealTime, lineDelay, lineInterval, lineFade);
+        }
+
+        if (mode == Mode.Ending)
+        {
+            UpdateEnding();
+            // A click only hurries the words; the fade and return always play out.
+            if (phase == EndingPhase.Words && !revealDone && Time.unscaledTime - openedAt > 1.5f && ContinuePressed())
+                revealTime = 1000f;
+            return;
         }
 
         if (mode == Mode.None) return;

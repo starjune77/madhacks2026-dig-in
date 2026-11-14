@@ -24,12 +24,20 @@ public class DigGame : MonoBehaviour
     public Workbench workbench;
     public MemoryShelf shelf;
     public Transform spawnPoint;
+    [Tooltip("Where the ending leaves the player: in front of the shelf.")]
+    public Transform endingView;
 
     [Header("Memories (in shelf order)")]
     public MemoryData[] memories;
     public MemoryFind findPrefab;
     [Tooltip("Optional find prefab per stratum; empty entries use findPrefab.")]
     public MemoryFind[] findPrefabsByStratum;
+
+    [Header("Ending")]
+    public MemoryData blankPage;
+    public MemoryFind blankPagePrefab;
+    [Tooltip("Depth at which the blank page turns up, once every memory has.")]
+    public float blankPageDepth = 23.6f;
 
     [Header("Shovels")]
     public string[] shovelNames = { "Toy Shovel", "Garden Shovel", "Steel Shovel" };
@@ -47,6 +55,7 @@ public class DigGame : MonoBehaviour
 
     bool[] spawned;
     bool[] found;
+    bool pageSpawned;
     MemoryFind[] liveFinds;
     float scrapProgress;
 
@@ -135,8 +144,42 @@ public class DigGame : MonoBehaviour
 
             debris.Burst(pos, Vector3.up, Vector3.zero, DigTerrain.StratumAt(-pos.y), 12);
             hud.ShowMessage("Something is buried here.", 4f);
-            break;   // one discovery per stroke
+            return;   // one discovery per stroke
         }
+
+        // At the very bottom, after everything else, a blank page.
+        if (!pageSpawned && blankPagePrefab != null && depth >= blankPageDepth && System.Array.TrueForAll(spawned, x => x))
+            SpawnBlankPage(digPoint);
+    }
+
+    void SpawnBlankPage(Vector3 near)
+    {
+        pageSpawned = true;
+        const float margin = 0.6f;
+        var pos = new Vector3(
+            Mathf.Clamp(near.x, margin, DigTerrain.Size - margin), 0f,
+            Mathf.Clamp(near.z, margin, DigTerrain.Size - margin));
+        pos.y = terrain.HeightAt(pos.x, pos.z);
+        var page = Instantiate(blankPagePrefab, pos, Quaternion.identity);
+        page.Init(blankPage, terrain);
+        debris.Burst(pos, Vector3.up, Vector3.zero, 2, 10);
+    }
+
+    // Called by DigStory while the screen is black: everything ends up on the shelf and
+    // the player is back at the surface, looking at it.
+    public void FinishEnding()
+    {
+        for (int i = 0; i < memories.Length; i++)
+        {
+            if (memories[i] == null) continue;
+            found[i] = true;
+            spawned[i] = true;
+            shelf.Fill(i, memories[i]);
+            if (liveFinds[i] != null) { Destroy(liveFinds[i].gameObject); liveFinds[i] = null; }
+        }
+        var view = endingView != null ? endingView : spawnPoint;
+        player.Teleport(view.position);
+        player.SetLook(view.eulerAngles.y, 6f);
     }
 
     // True when all memories of a stratum have been picked up.
@@ -158,6 +201,13 @@ public class DigGame : MonoBehaviour
         if (!Physics.Raycast(ray, out RaycastHit hit, reach + 0.3f, ~0, QueryTriggerInteraction.Collide)) return false;
         var find = hit.collider.GetComponentInParent<MemoryFind>();
         if (find == null) return false;
+
+        if (find.Data == blankPage)
+        {
+            Destroy(find.gameObject);
+            story.PlayEnding();
+            return true;
+        }
 
         int index = System.Array.IndexOf(memories, find.Data);
         Destroy(find.gameObject);

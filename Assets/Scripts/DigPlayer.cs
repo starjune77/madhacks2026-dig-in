@@ -212,6 +212,14 @@ public class DigPlayer : MonoBehaviour
         shovel.Pose(swinging ? swingTime / SwingDuration : -1f, bobPhase, bobAmount);
     }
 
+    public void SetLook(float yaw, float newPitch)
+    {
+        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        pitch = newPitch;
+        kickPitch = 0f;
+        kickRoll = 0f;
+    }
+
     public void Teleport(Vector3 position)
     {
         cc.enabled = false;

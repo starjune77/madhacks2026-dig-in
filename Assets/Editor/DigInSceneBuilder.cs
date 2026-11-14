@@ -42,7 +42,8 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
-    const string HudVersion = "v3 letters";
+    const string HudVersion = "v4 ending";
+    const string PageVersion = "v1 page";
 
     static readonly Color[] StrataColors =
     {
@@ -72,6 +73,15 @@ public static partial class DigInSceneBuilder
         var m = BuildMaterials();
         var memories = BuildMemories();
         var letters = BuildLetters();
+        var blankPage = LoadOrCreate("Assets/Data/Blank Page.asset", () =>
+        {
+            var page = ScriptableObject.CreateInstance<MemoryData>();
+            page.title = "A Blank Page";
+            page.line = "";
+            page.depth = 23.6f;
+            page.stratum = 2;
+            return page;
+        });
         var font = BuildFont("Lora-Regular");
         var italic = BuildFont("Lora-Italic");
         var wallMesh = LoadOrCreate(MeshDir + "/ShaftWalls.asset", DigTerrain.BuildWallMesh);
@@ -86,6 +96,7 @@ public static partial class DigInSceneBuilder
         };
         var shelfPrefab = BuildShelfPrefab(m, font, rebuilt);
         var benchPrefab = BuildWorkbenchPrefab(rebuilt);
+        var pagePrefab = BuildBlankPagePrefab(m, rebuilt);
         var hudPrefab = BuildHudPrefab(font, italic, rebuilt);
         ApplyFont(hudPrefab, font);
 
@@ -111,6 +122,7 @@ public static partial class DigInSceneBuilder
         }
 
         WireGame(scene, memories, letters, findPrefabs);
+        WireEnding(scene, blankPage, pagePrefab, letters[3]);
         DeleteUnusedAssets();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -557,6 +569,39 @@ public static partial class DigInSceneBuilder
         return new MemoryShelf.Slot { filled = card.gameObject, title = title, illustration = art.GetComponent<Renderer>() };
     }
 
+    // The last thing at the bottom: a single sheet of paper, glowing faintly.
+    static GameObject BuildBlankPagePrefab(Mats m, HashSet<string> rebuilt)
+    {
+        string path = PrefabDir + "/Blank Page.prefab";
+        var current = CurrentPrefab(path, PageVersion, "Page", rebuilt);
+        if (current != null) return current;
+
+        var root = new GameObject("Blank Page");
+        AddMarker(root, PageVersion);
+        var col = root.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 0.35f;
+        var find = root.AddComponent<MemoryFind>();
+        find.size = 1f;
+        find.hover = 0.04f;
+
+        var holder = new GameObject("Model").transform;
+        holder.SetParent(root.transform, false);
+        Part(PrimitiveType.Cube, "Sheet", holder, new Vector3(0f, 0.004f, 0f), new Vector3(0f, 12f, 0f), new Vector3(0.21f, 0.004f, 0.297f), m.paper);
+        find.model = holder;
+
+        var glowGo = new GameObject("Glow");
+        glowGo.transform.SetParent(root.transform, false);
+        glowGo.transform.localPosition = new Vector3(0f, 0.5f, 0f);
+        var glow = glowGo.AddComponent<Light>();
+        glow.type = LightType.Point;
+        glow.color = new Color(1f, 0.95f, 0.85f);
+        glow.range = 2.5f;
+        glow.intensity = 2.2f;
+        glow.shadows = LightShadows.None;
+        return SavePrefab(root, path);
+    }
+
     static GameObject BuildWorkbenchPrefab(HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/Workbench.prefab";
@@ -643,6 +688,16 @@ public static partial class DigInSceneBuilder
 
         BuildCardUi(root.transform, hud, font, italic);
         BuildLetterUi(root.transform, hud, font, italic);
+        BuildEndingUi(root.transform, hud, italic);
+
+        // Full-screen black on top of everything, for the ending's fade.
+        var fade = UiNode("Fade", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var black = fade.gameObject.AddComponent<Image>();
+        black.color = Color.black;
+        black.raycastTarget = false;
+        hud.fadeGroup = fade.gameObject.AddComponent<CanvasGroup>();
+        hud.fadeGroup.alpha = 0f;
+        hud.fadeGroup.blocksRaycasts = false;
         return SavePrefab(root, path);
     }
 
@@ -717,6 +772,32 @@ public static partial class DigInSceneBuilder
 
         p.hint = Ink("Hint", paper.transform, font, 20f, TextAlignmentOptions.Center, "Click to continue",
             new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(760f, 34f), 0.5f);
+    }
+
+    // The ending: a blank sheet of paper, and beneath it, lines that fade in on the dark.
+    static void BuildEndingUi(Transform root, DigHud hud, TMP_FontAsset italic)
+    {
+        var p = hud.ending;
+        p.group = Overlay("Ending", root, new Color(0.02f, 0.015f, 0.01f, 0.9f));
+        Paper("Blank Page", p.group.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 190f), new Vector2(300f, 400f));
+
+        var body = UiNode("Lines", p.group.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -150f), new Vector2(1200f, 340f));
+        var layout = body.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 18f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        for (int i = 0; i < 6; i++)
+        {
+            var t = Text("Line " + (i + 1), body, italic, italic.material, 36f, TextAlignmentOptions.Top,
+                "A line of the ending.", Vector2.zero, new Vector2(1200f, 50f));
+            t.color = TextColor;
+        }
+        p.lines = body.GetComponentsInChildren<TMP_Text>(true);
+        p.title = null;
+        p.hint = null;
     }
 
     // Memory card: name, illustration area, the one-line memory.
@@ -942,6 +1023,25 @@ public static partial class DigInSceneBuilder
         }
         EditorUtility.SetDirty(atmosphere);
         report.AppendLine("  wired Game references");
+    }
+
+    static void WireEnding(Scene scene, MemoryData blankPage, GameObject pagePrefab, LetterData endingLetter)
+    {
+        var game = Find<DigGame>(scene);
+        var story = Find<DigStory>(scene);
+        var hub = FindRoot(scene, "Surface Hub");
+        if (game != null)
+        {
+            if (game.blankPage == null) game.blankPage = blankPage;
+            if (game.blankPagePrefab == null) game.blankPagePrefab = pagePrefab.GetComponent<MemoryFind>();
+            if (game.endingView == null && hub != null) game.endingView = hub.Find("Ending View");
+            EditorUtility.SetDirty(game);
+        }
+        if (story != null)
+        {
+            if (story.ending == null) story.ending = endingLetter;
+            EditorUtility.SetDirty(story);
+        }
     }
 
     // ---- Helpers -------------------------------------------------------------
