@@ -32,7 +32,8 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
 ## Conventions
 
 - **Assets over code. Code draws only what must be procedural.** Code generates only the deformable heightmap terrain (and its strata texture lookup), the dirt debris, and runtime state. Everything else (environment, props, shovel, player, hub, UI, lighting) is real Unity content: GameObjects saved in SampleScene, prefabs, materials and textures in `Assets/`, UI as a UGUI Canvas, all editable in the editor. Runtime code references them through serialized fields and never creates them.
-- Because Claude cannot click in the editor, persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. New content goes into that script, not into runtime code.
+- Because Claude cannot click in the editor, persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder*.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. Prefabs carry a version marker child (e.g. "v2 bookcase"); bumping the version constant rebuilds that prefab and recreates its scene instances. New content goes into that script, not into runtime code.
+- Kenney models are placed by their measured bounds (`Place`, `FitInside`, `Edge` helpers), never by assumed sizes: the kits use different units (cm, 10 cm, m) and pivots.
 - **No sound.** Do not add any audio (procedural or files) until the developer explicitly asks for it.
 - Use only the new Input System (`Keyboard.current`, `Mouse.current`). The legacy `Input` class throws errors in this project.
 - Never call `Shader.Find` at runtime (shaders can be stripped from builds). In editor scripts it is fine, because the saved material asset keeps a hard reference to its shader.
@@ -56,7 +57,8 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
   - `MemoryFind.cs` (Memory Find prefab): a found object lying in the dirt.
   - `MemoryShelf.cs` (Memory Shelf prefab): nine slots, rows top to bottom = Childhood, School Days, Growing Up.
   - `Workbench.cs` (Workbench prefab): upgrade spot. Walk up and press E.
-- `Assets/Editor/DigInSceneBuilder.cs`: the setup script.
+- `Assets/Editor/DigInSceneBuilder.cs`: the setup script (assets, prefabs, lighting, shaft, hub, wiring).
+- `Assets/Editor/DigInSceneBuilder.Environment.cs`: the world: terrain (heightmap from `GroundHeight`, strata-banded terrace faces, pines), house, yard, shaft rim, excavation props, rock formations.
 - `Assets/Materials`, `Assets/Textures`, `Assets/Meshes`, `Assets/Prefabs`, `Assets/Data`, `Assets/Fonts`: content made by the setup script, then edited by hand.
 - `Assets/ThirdParty/`: imported art packs (see Art below). Do not edit files there; make prefab variants instead.
 
@@ -68,9 +70,11 @@ Notes:
 
 ## Art
 
-- Use real art assets, not primitives and flat colours. Prefer CC0 packs (Kenney, Poly Haven) so nothing needs licensing review; list every pack in the Devpost credits anyway.
-- Planned packs (import into `Assets/ThirdParty/<Pack>/`): Kenney Nature Kit (terrain, rocks, cliffs, trees), Kenney Survival Kit (shovel, workbench, barrels, crates, tools), Kenney Furniture Kit (shelf), Kenney Fantasy Town Kit (the old house, fences), Poly Haven "Evening Field" HDRI (sky). Font: Lora (Google Fonts, OFL) in `Assets/Fonts/`.
-- Look: golden hour, light fog, a vast excavation landscape around a small family backyard. Deeper in the shaft: dimmer, warmer, lit by the lantern.
+- Use real art assets, not primitives and flat colours. All packs are CC0 (Kenney, Poly Haven) or OFL (Lora); list them in the Devpost credits anyway.
+- Imported: `Assets/ThirdParty/Kenney/{NatureKit,SurvivalKit,FurnitureKit,FantasyTownKit}` (FBX only), `Assets/ThirdParty/PolyHaven/evening_field_2k.hdr`, `Assets/Fonts/Lora-{Regular,Italic}.ttf`. Do not edit files there.
+- The HDRI is photographic, so it is only used as the reflection cubemap; the visible sky is a procedural skybox, and ambient is Trilight (DigAtmosphere darkens it with depth).
+- World layout (metres, shaft at x,z 0..5): yard x -12..17, z -16..10, fenced; house back wall along z = -16 with the door at x = 4 and the shelf at x = 0.8; workbench under a lean-to at (12.3, -7); spawn (3, -8) facing north. Excavation north of the yard: elliptical terraces centred (2.5, 50), 3 m steps, floor at -12, ramp at x = 21. Terrain is 256 m square from (-126, -126), 0.5 m cells, with a hole over the shaft.
+- Look: golden hour, light fog, a vast excavation landscape next to a small family backyard. Deeper in the shaft: dimmer, warmer, lit by the lantern.
 
 ## Digging feel (roadmap step 1)
 

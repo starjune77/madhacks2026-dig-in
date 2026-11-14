@@ -1,16 +1,20 @@
+using TMPro;
 using UnityEngine;
 
-// The shelf at the surface. Nine slots, one per memory, in the same order as
-// DigGame.memories (row 1 = Childhood, row 2 = School Days, row 3 = Growing Up).
-// Each slot has an "empty" marker and a "filled" object (the card) that is hidden
-// until the memory is found.
+// The shelf by the back door. Nine slots, one per memory, in the same order as
+// DigGame.memories (top row = Childhood, middle = School Days, bottom = Growing Up).
+// Each slot holds a small framed card that is hidden until the memory is found.
 public class MemoryShelf : MonoBehaviour
 {
     [System.Serializable]
     public class Slot
     {
+        [Tooltip("Optional marker shown while the slot is empty.")]
         public GameObject empty;
+        [Tooltip("The framed card, hidden until the memory is found.")]
         public GameObject filled;
+        public TMP_Text title;
+        public Renderer illustration;
     }
 
     public Slot[] slots = new Slot[9];
@@ -25,12 +29,10 @@ public class MemoryShelf : MonoBehaviour
         Show(index, true);
     }
 
-    public int FilledCount()
+    public bool IsFilled(int index)
     {
-        int n = 0;
-        foreach (var s in slots)
-            if (s != null && s.filled != null && s.filled.activeSelf) n++;
-        return n;
+        return index >= 0 && index < slots.Length && slots[index] != null &&
+               slots[index].filled != null && slots[index].filled.activeSelf;
     }
 
     void Show(int index, bool filled)

@@ -13,14 +13,17 @@ using UnityEngine.UI;
 
 // DigIn > Build Scene
 //
-// Creates the project's persistent content (materials, textures, meshes, memory data,
-// prefabs) and the SampleScene objects, then saves everything. After it has run once,
-// the content lives in Assets/ and in the scene and is edited there like any other.
+// Creates the project's persistent content (materials, textures, terrain, memory data,
+// prefabs) and the SampleScene objects, then saves everything. After it has run, the
+// content lives in Assets/ and in the scene and is edited there like any other.
 //
-// Re-running is safe: every asset and scene object is only created if it does not
-// exist yet. To regenerate one piece, delete it (asset or scene object) and run again.
-// Scene references on Game are filled in only where they are empty.
-public static class DigInSceneBuilder
+// Re-running is safe: assets and scene objects are only created when missing. A prefab
+// is rebuilt when it lacks its current version marker (an empty child named "vN ..."),
+// and its scene instances are recreated. To regenerate anything else, delete it and run
+// again. Scene references on Game are filled in only where they are empty.
+//
+// The environment (terrain, house, yard, excavation) lives in DigInSceneBuilder.Environment.cs.
+public static partial class DigInSceneBuilder
 {
     const string ScenePath = "Assets/Scenes/SampleScene.unity";
     const string MatDir = "Assets/Materials";
@@ -29,6 +32,15 @@ public static class DigInSceneBuilder
     const string PrefabDir = "Assets/Prefabs";
     const string MemoryDir = "Assets/Data/Memories";
     const string FontDir = "Assets/Fonts";
+    const string TerrainDir = "Assets/Terrain";
+    const string KenneyDir = "Assets/ThirdParty/Kenney";
+    const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
+
+    // Prefab version markers. Bump one to rebuild that prefab on the next run.
+    const string PlayerVersion = "v2 kenney shovels";
+    const string FindVersion = "v2 kenney box";
+    const string ShelfVersion = "v2 bookcase";
+    const string BenchVersion = "v2 kenney bench";
 
     static readonly Color[] StrataColors =
     {
@@ -39,6 +51,7 @@ public static class DigInSceneBuilder
     };
 
     static readonly Color TextColor = new Color(1f, 0.95f, 0.86f, 1f);
+    static readonly Color InkColor = new Color(0.22f, 0.16f, 0.11f, 1f);
 
     static StringBuilder report;
 
@@ -52,22 +65,44 @@ public static class DigInSceneBuilder
         report = new StringBuilder("DigIn/Build Scene\n");
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
-        foreach (var dir in new[] { MatDir, TexDir, MeshDir, PrefabDir, MemoryDir, FontDir }) EnsureFolder(dir);
+        foreach (var dir in new[] { MatDir, TexDir, MeshDir, PrefabDir, MemoryDir, FontDir, TerrainDir }) EnsureFolder(dir);
 
         var m = BuildMaterials();
         var memories = BuildMemories();
-        var font = BuildFont();
+        var font = BuildFont("Lora-Regular");
         var wallMesh = LoadOrCreate(MeshDir + "/ShaftWalls.asset", DigTerrain.BuildWallMesh);
 
-        var playerPrefab = BuildPlayerPrefab(m);
-        var findPrefab = BuildFindPrefab(m);
-        var shelfPrefab = BuildShelfPrefab(m);
-        var benchPrefab = BuildWorkbenchPrefab(m);
+        var rebuilt = new HashSet<string>();
+        var playerPrefab = BuildPlayerPrefab(m, rebuilt);
+        var findPrefab = BuildFindPrefab(rebuilt);
+        var shelfPrefab = BuildShelfPrefab(m, font, rebuilt);
+        var benchPrefab = BuildWorkbenchPrefab(rebuilt);
         var hudPrefab = BuildHudPrefab(font);
         ApplyFont(hudPrefab, font);
 
         BuildLighting(m);
-        BuildScene(scene, m, wallMesh, memories, playerPrefab, findPrefab, shelfPrefab, benchPrefab, hudPrefab);
+        Migrate(scene, rebuilt);
+
+        BuildDigSite(scene, m, wallMesh);
+        BuildEnvironment(scene);
+        BuildHub(scene, shelfPrefab, benchPrefab);
+
+        var player = Root(scene, "Player", out bool newPlayer, playerPrefab);
+        if (newPlayer) player.position = new Vector3(3f, 1f, -8f);
+        Root(scene, "HUD", out _, hudPrefab);
+
+        // The template's camera is replaced by the one in the Player prefab.
+        foreach (var go in scene.GetRootGameObjects())
+        {
+            if (go.name == "Main Camera" && go.GetComponent<Camera>() != null)
+            {
+                Object.DestroyImmediate(go);
+                report.AppendLine("  removed the old Main Camera");
+            }
+        }
+
+        WireGame(scene, memories, findPrefab);
+        DeleteUnusedAssets();
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
@@ -86,12 +121,47 @@ public static class DigInSceneBuilder
         return false;
     }
 
+    // Removes scene objects that belong to an older version of the content.
+    static void Migrate(Scene scene, HashSet<string> rebuilt)
+    {
+        DestroyRoot(scene, "Ground (placeholder)");
+        if (rebuilt.Contains("Player")) DestroyRoot(scene, "Player");
+        if (rebuilt.Contains("Shelf") || rebuilt.Contains("Bench")) DestroyRoot(scene, "Surface Hub");
+
+        var hub = FindRoot(scene, "Surface Hub");
+        if (hub != null && hub.Find("Lean-to") == null) DestroyRoot(scene, "Surface Hub");
+
+        // v1 had 40 m earth boxes around the shaft; they would cover the excavation.
+        var earth = FindRoot(scene, "Dig Site")?.Find("Shaft Earth");
+        var west = earth != null ? earth.Find("West") : null;
+        if (west != null && west.localScale.x > 10f)
+        {
+            Object.DestroyImmediate(earth.gameObject);
+            report.AppendLine("  removed v1 Shaft Earth");
+        }
+    }
+
+    static void DeleteUnusedAssets()
+    {
+        string[] old =
+        {
+            "Placeholder Grass", "Placeholder Earth", "Placeholder Wood", "Placeholder Wood Dark", "Placeholder Card",
+            "Placeholder Find", "Shovel Toy Handle", "Shovel Garden Handle", "Shovel Steel Handle",
+            "Shovel Toy Blade", "Shovel Garden Blade", "Shovel Steel Blade",
+        };
+        foreach (var name in old)
+        {
+            string path = MatDir + "/" + name + ".mat";
+            if (AssetDatabase.LoadAssetAtPath<Material>(path) != null && AssetDatabase.DeleteAsset(path))
+                report.AppendLine("  deleted " + path);
+        }
+    }
+
     // ---- Assets --------------------------------------------------------------
     class Mats
     {
-        public Material strata, grass, earth, wood, woodDark, paper, find, sky;
+        public Material strata, earth, paper, frame, sky;
         public Material[] clods;
-        public Material[] shovelHandle, shovelBlade;
     }
 
     static Mats BuildMaterials()
@@ -106,27 +176,9 @@ public static class DigInSceneBuilder
             Mat("Clod Clay", StrataColors[1] * 0.9f, 0.05f),
             Mat("Clod Stone", StrataColors[2] * 0.9f, 0.05f),
         };
-
-        // Placeholders: swapped for imported art later.
-        m.grass = Mat("Placeholder Grass", new Color(0.42f, 0.52f, 0.28f), 0.05f);
-        m.earth = Mat("Placeholder Earth", new Color(0.36f, 0.26f, 0.18f), 0.05f);
-        m.wood = Mat("Placeholder Wood", new Color(0.55f, 0.39f, 0.25f), 0.2f);
-        m.woodDark = Mat("Placeholder Wood Dark", new Color(0.30f, 0.21f, 0.14f), 0.2f);
-        m.paper = Mat("Placeholder Card", new Color(0.95f, 0.91f, 0.82f), 0.1f);
-        m.find = Mat("Placeholder Find", new Color(0.98f, 0.80f, 0.35f), 0.6f);
-
-        m.shovelHandle = new[]
-        {
-            Mat("Shovel Toy Handle", new Color(0.95f, 0.78f, 0.20f), 0.3f),
-            Mat("Shovel Garden Handle", new Color(0.58f, 0.40f, 0.22f), 0.3f),
-            Mat("Shovel Steel Handle", new Color(0.42f, 0.28f, 0.16f), 0.3f),
-        };
-        m.shovelBlade = new[]
-        {
-            Mat("Shovel Toy Blade", new Color(0.86f, 0.22f, 0.20f), 0.5f),
-            Mat("Shovel Garden Blade", new Color(0.22f, 0.36f, 0.27f), 0.4f),
-            Mat("Shovel Steel Blade", new Color(0.74f, 0.76f, 0.80f), 0.8f, 0.6f),
-        };
+        m.earth = Mat("Shaft Earth", new Color(0.36f, 0.26f, 0.18f), 0.05f);
+        m.paper = Mat("Card Paper", new Color(0.96f, 0.92f, 0.83f), 0.1f);
+        m.frame = Mat("Card Frame", new Color(0.33f, 0.22f, 0.14f), 0.35f);
 
         m.sky = LoadOrCreate(MatDir + "/Sky Golden Hour.mat", () =>
         {
@@ -197,28 +249,24 @@ public static class DigInSceneBuilder
         return result;
     }
 
-    // Uses a font from Assets/Fonts if one has been imported (prefers "*-Regular"),
-    // otherwise TMP's default font.
-    static TMP_FontAsset BuildFont()
+    // A TMP font asset made from Assets/Fonts/<fileName>.ttf, or TMP's default font if
+    // that file has not been imported.
+    static TMP_FontAsset BuildFont(string fileName)
     {
-        var fontPaths = Directory.GetFiles(FontDir)
-            .Where(p => p.EndsWith(".ttf") || p.EndsWith(".otf"))
-            .Select(p => p.Replace('\\', '/'))
-            .OrderBy(p => p.Contains("-Regular") ? 0 : 1)
-            .ToList();
-        if (fontPaths.Count == 0)
-        {
-            report.AppendLine("  font: none in " + FontDir + ", using the TMP default");
-            return TMP_Settings.defaultFontAsset;
-        }
-
-        string fontPath = fontPaths[0];
-        string sdfPath = Path.GetDirectoryName(fontPath).Replace('\\', '/') + "/" + Path.GetFileNameWithoutExtension(fontPath) + " SDF.asset";
+        string fontPath = FontDir + "/" + fileName + ".ttf";
+        string sdfPath = FontDir + "/" + fileName + " SDF.asset";
         var fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(sdfPath);
         if (fontAsset != null) { Skipped(sdfPath); return fontAsset; }
 
+        var font = AssetDatabase.LoadAssetAtPath<Font>(fontPath);
+        if (font == null)
+        {
+            report.AppendLine("  font: " + fontPath + " not found, using the TMP default");
+            return TMP_Settings.defaultFontAsset;
+        }
+
         // Let TMP's own menu command build it, so it is set up exactly as TMP expects.
-        Selection.activeObject = AssetDatabase.LoadAssetAtPath<Font>(fontPath);
+        Selection.activeObject = font;
         EditorApplication.ExecuteMenuItem("Assets/Create/TextMeshPro/Font Asset/SDF");
         AssetDatabase.Refresh();
         fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(sdfPath);
@@ -247,13 +295,28 @@ public static class DigInSceneBuilder
     }
 
     // ---- Prefabs -------------------------------------------------------------
-    static GameObject BuildPlayerPrefab(Mats m)
+    // Returns the existing prefab if it is current; otherwise null (and logs why).
+    static GameObject CurrentPrefab(string path, string version, string key, HashSet<string> rebuilt)
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (existing != null && existing.transform.Find(version) != null) { Skipped(path); return existing; }
+        if (existing != null) rebuilt.Add(key);
+        return null;
+    }
+
+    static void AddMarker(GameObject root, string version)
+    {
+        new GameObject(version).transform.SetParent(root.transform, false);
+    }
+
+    static GameObject BuildPlayerPrefab(Mats m, HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/Player.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        if (existing != null) { Skipped(path); return existing; }
+        var current = CurrentPrefab(path, PlayerVersion, "Player", rebuilt);
+        if (current != null) return current;
 
         var root = new GameObject("Player");
+        AddMarker(root, PlayerVersion);
         var cc = root.AddComponent<CharacterController>();
         cc.height = 1.8f;
         cc.radius = 0.35f;
@@ -285,11 +348,16 @@ public static class DigInSceneBuilder
         var shovelGo = new GameObject("Shovel");
         shovelGo.transform.SetParent(camGo.transform, false);
         var shovel = shovelGo.AddComponent<DigShovel>();
+
+        // One Kenney shovel per level, told apart by size and tint.
+        var baseMat = KitMaterial("SurvivalKit/tool-shovel");
+        var toyMat = TintedMaterial("Shovel Toy", baseMat, new Color(1f, 0.62f, 0.38f), 0.45f, 0f);
+        var steelMat = TintedMaterial("Shovel Steel", KitMaterial("SurvivalKit/tool-shovel-upgraded"), new Color(0.86f, 0.9f, 1f), 0.6f, 0.35f);
         shovel.models = new[]
         {
-            ShovelModel("Toy Shovel (placeholder)", shovelGo.transform, 0.42f, 0.030f, 0.13f, 0.15f, m.shovelHandle[0], m.shovelBlade[0]),
-            ShovelModel("Garden Shovel (placeholder)", shovelGo.transform, 0.60f, 0.032f, 0.16f, 0.20f, m.shovelHandle[1], m.shovelBlade[1]),
-            ShovelModel("Steel Shovel (placeholder)", shovelGo.transform, 0.70f, 0.034f, 0.20f, 0.26f, m.shovelHandle[2], m.shovelBlade[2]),
+            ShovelModel("Toy Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.46f, toyMat),
+            ShovelModel("Garden Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.64f, null),
+            ShovelModel("Steel Shovel", shovelGo.transform, "SurvivalKit/tool-shovel-upgraded", 0.74f, steelMat),
         };
         shovel.models[1].SetActive(false);
         shovel.models[2].SetActive(false);
@@ -301,69 +369,96 @@ public static class DigInSceneBuilder
         return SavePrefab(root, path);
     }
 
-    // Origin = grip; the handle runs along +Z to the blade.
-    static GameObject ShovelModel(string name, Transform parent, float length, float thickness,
-                                  float bladeWidth, float bladeLength, Material handle, Material blade)
+    // DigShovel expects: origin = grip, handle along +Z to the blade. The Kenney shovel
+    // stands along +Y with the grip at the bottom, so it is tipped forward 90 degrees.
+    static GameObject ShovelModel(string name, Transform parent, string kitModel, float length, Material tint)
     {
-        var root = new GameObject(name);
-        root.transform.SetParent(parent, false);
-        Part(PrimitiveType.Cylinder, "Handle", root.transform, new Vector3(0f, 0f, length * 0.5f), new Vector3(90f, 0f, 0f),
-            new Vector3(thickness, length * 0.5f, thickness), handle, shadows: false);
-        Part(PrimitiveType.Cube, "Grip", root.transform, new Vector3(0f, 0f, -0.01f), Vector3.zero,
-            new Vector3(0.09f, thickness, thickness), blade, shadows: false);
-        Part(PrimitiveType.Cube, "Blade", root.transform, new Vector3(0f, -0.012f, length + bladeLength * 0.5f - 0.02f), new Vector3(8f, 0f, 0f),
-            new Vector3(bladeWidth, 0.012f, bladeLength), blade, shadows: false);
-        return root;
+        var holder = new GameObject(name);
+        holder.transform.SetParent(parent, false);
+        var model = InstantiateKit(kitModel, holder.transform);
+        if (model == null) return holder;
+        model.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+        var b = LocalBounds(holder.transform);
+        model.transform.localScale *= length / Mathf.Max(0.001f, b.size.z);
+        b = LocalBounds(holder.transform);
+        model.transform.localPosition -= new Vector3(b.center.x, b.center.y, b.min.z);
+
+        foreach (var r in holder.GetComponentsInChildren<Renderer>())
+        {
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            if (tint != null) r.sharedMaterials = r.sharedMaterials.Select(_ => tint).ToArray();
+        }
+        return holder;
     }
 
-    static GameObject BuildFindPrefab(Mats m)
+    static GameObject BuildFindPrefab(HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/Memory Find.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        if (existing != null) { Skipped(path); return existing; }
+        var current = CurrentPrefab(path, FindVersion, "Find", rebuilt);
+        if (current != null) return current;
 
         var root = new GameObject("Memory Find");
+        AddMarker(root, FindVersion);
         var col = root.AddComponent<SphereCollider>();
         col.isTrigger = true;
         col.radius = 0.35f;
+        col.center = new Vector3(0f, 0.15f, 0f);
         var find = root.AddComponent<MemoryFind>();
-        find.model = Part(PrimitiveType.Sphere, "Model (placeholder)", root.transform, Vector3.zero, Vector3.zero, Vector3.one, m.find).transform;
+        find.size = 1f;
+        find.hover = 0.02f;
+
+        // A small closed cardboard box: something someone kept.
+        var holder = new GameObject("Model").transform;
+        holder.SetParent(root.transform, false);
+        var box = InstantiateKit("FurnitureKit/cardboardBoxClosed", holder);
+        if (box != null) FitInside(box, holder, height: 0.26f);
+        find.model = holder;
 
         var glowGo = new GameObject("Glow");
         glowGo.transform.SetParent(root.transform, false);
-        glowGo.transform.localPosition = new Vector3(0f, 0.3f, 0f);
+        glowGo.transform.localPosition = new Vector3(0f, 0.45f, 0f);
         var glow = glowGo.AddComponent<Light>();
         glow.type = LightType.Point;
         glow.color = new Color(1f, 0.85f, 0.55f);
-        glow.range = 1.6f;
-        glow.intensity = 1.5f;
+        glow.range = 1.8f;
+        glow.intensity = 1.6f;
         glow.shadows = LightShadows.None;
         return SavePrefab(root, path);
     }
 
-    // Front faces +Z. Rows top to bottom: Childhood, School Days, Growing Up.
-    static GameObject BuildShelfPrefab(Mats m)
+    // Kenney's open bookcase, widened, with nine card slots on its three shelves.
+    // Rows top to bottom: Childhood, School Days, Growing Up. Front faces +Z.
+    static GameObject BuildShelfPrefab(Mats m, TMP_FontAsset font, HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/Memory Shelf.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        if (existing != null) { Skipped(path); return existing; }
+        var current = CurrentPrefab(path, ShelfVersion, "Shelf", rebuilt);
+        if (current != null) return current;
 
-        const float w = 1.8f, h = 1.9f, d = 0.4f;
         var root = new GameObject("Memory Shelf");
-        var col = root.AddComponent<BoxCollider>();
-        col.center = new Vector3(0f, h * 0.5f, 0f);
-        col.size = new Vector3(w, h, d);
+        AddMarker(root, ShelfVersion);
         var shelf = root.AddComponent<MemoryShelf>();
 
-        var model = new GameObject("Model (placeholder)").transform;
-        model.SetParent(root.transform, false);
-        Part(PrimitiveType.Cube, "Side L", model, new Vector3(-w * 0.5f + 0.03f, h * 0.5f, 0f), Vector3.zero, new Vector3(0.06f, h, d), m.wood);
-        Part(PrimitiveType.Cube, "Side R", model, new Vector3(w * 0.5f - 0.03f, h * 0.5f, 0f), Vector3.zero, new Vector3(0.06f, h, d), m.wood);
-        Part(PrimitiveType.Cube, "Back", model, new Vector3(0f, h * 0.5f, -d * 0.5f + 0.015f), Vector3.zero, new Vector3(w, h, 0.03f), m.woodDark);
-        float[] boards = { 0.05f, 0.65f, 1.25f, h - 0.02f };
-        for (int i = 0; i < boards.Length; i++)
-            Part(PrimitiveType.Cube, "Board " + (i + 1), model, new Vector3(0f, boards[i], 0f), Vector3.zero, new Vector3(w, 0.04f, d), m.wood);
+        var holder = new GameObject("Model").transform;
+        holder.SetParent(root.transform, false);
+        var bookcase = InstantiateKit("FurnitureKit/bookcaseOpen", holder);
+        Bounds b;
+        if (bookcase != null)
+        {
+            FitInside(bookcase, holder, height: 2.1f);
+            bookcase.transform.localScale = Vector3.Scale(bookcase.transform.localScale, new Vector3(1.5f, 1f, 1f));
+            b = LocalBounds(holder);
+            bookcase.transform.localPosition -= new Vector3(b.center.x, b.min.y, b.center.z);
+        }
+        b = LocalBounds(holder);
+        if (b.size == Vector3.zero) b = new Bounds(new Vector3(0f, 1.05f, 0f), new Vector3(1.4f, 2.1f, 0.6f));
 
+        var col = root.AddComponent<BoxCollider>();
+        col.center = b.center;
+        col.size = b.size;
+
+        // Shelf board tops in the Kenney model, as a fraction of its height.
+        float[] rowTop = { 6.1f / 8.8f, 3.7f / 8.8f, 1.3f / 8.8f };
         var slotsRoot = new GameObject("Slots").transform;
         slotsRoot.SetParent(root.transform, false);
         shelf.slots = new MemoryShelf.Slot[9];
@@ -372,42 +467,66 @@ public static class DigInSceneBuilder
             int row = i / 3, column = i % 3;
             var slot = new GameObject("Slot " + (i + 1)).transform;
             slot.SetParent(slotsRoot, false);
-            slot.localPosition = new Vector3((column - 1) * 0.55f, boards[2 - row] + 0.02f, 0.02f);
-
-            var empty = Part(PrimitiveType.Cube, "Empty", slot, new Vector3(0f, 0.004f, 0f), Vector3.zero, new Vector3(0.34f, 0.008f, 0.26f), m.woodDark);
-            var card = Part(PrimitiveType.Cube, "Card (placeholder)", slot, new Vector3(0f, 0.19f, -0.06f), new Vector3(-10f, 0f, 0f), new Vector3(0.28f, 0.36f, 0.01f), m.paper);
-            card.SetActive(false);
-            shelf.slots[i] = new MemoryShelf.Slot { empty = empty, filled = card };
+            slot.localPosition = new Vector3(b.center.x + (column - 1) * b.size.x * 0.29f, b.min.y + b.size.y * rowTop[row] + 0.005f, b.center.z);
+            shelf.slots[i] = BuildShelfCard(slot, m, font);
         }
         return SavePrefab(root, path);
     }
 
-    // Front faces +Z; the player stands at "Interact Point".
-    static GameObject BuildWorkbenchPrefab(Mats m)
+    // A small framed card standing on the shelf, leaning back. Built facing -Z (the way
+    // quads and TMP text face) and turned around to face the room.
+    static MemoryShelf.Slot BuildShelfCard(Transform slot, Mats m, TMP_FontAsset font)
+    {
+        const float w = 0.26f, h = 0.34f;
+        var card = new GameObject("Card").transform;
+        card.SetParent(slot, false);
+        card.localRotation = Quaternion.Euler(8f, 180f, 0f);
+
+        Part(PrimitiveType.Cube, "Frame", card, new Vector3(0f, h * 0.5f, 0.012f), Vector3.zero, new Vector3(w, h, 0.02f), m.frame);
+        Part(PrimitiveType.Quad, "Paper", card, new Vector3(0f, h * 0.5f, -0.001f), Vector3.zero, new Vector3(w - 0.03f, h - 0.03f, 1f), m.paper);
+        var art = Part(PrimitiveType.Quad, "Illustration", card, new Vector3(0f, h * 0.6f, -0.002f), Vector3.zero, new Vector3(w - 0.07f, h * 0.48f, 1f), m.paper);
+
+        var titleGo = new GameObject("Title", typeof(RectTransform));
+        titleGo.transform.SetParent(card, false);
+        var rt = (RectTransform)titleGo.transform;
+        rt.localPosition = new Vector3(0f, h * 0.2f, -0.003f);
+        rt.sizeDelta = new Vector2(w - 0.05f, 0.06f);
+        var title = titleGo.AddComponent<TextMeshPro>();
+        title.font = font;
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 0.05f;
+        title.fontSizeMax = 0.3f;
+        title.alignment = TextAlignmentOptions.Center;
+        title.color = InkColor;
+        title.text = "";
+
+        card.gameObject.SetActive(false);
+        return new MemoryShelf.Slot { filled = card.gameObject, title = title, illustration = art.GetComponent<Renderer>() };
+    }
+
+    static GameObject BuildWorkbenchPrefab(HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/Workbench.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        if (existing != null) { Skipped(path); return existing; }
+        var current = CurrentPrefab(path, BenchVersion, "Bench", rebuilt);
+        if (current != null) return current;
 
         var root = new GameObject("Workbench");
-        var col = root.AddComponent<BoxCollider>();
-        col.center = new Vector3(0f, 0.45f, 0f);
-        col.size = new Vector3(1.6f, 0.9f, 0.7f);
+        AddMarker(root, BenchVersion);
         var bench = root.AddComponent<Workbench>();
 
-        var model = new GameObject("Model (placeholder)").transform;
-        model.SetParent(root.transform, false);
-        Part(PrimitiveType.Cube, "Top", model, new Vector3(0f, 0.86f, 0f), Vector3.zero, new Vector3(1.6f, 0.08f, 0.7f), m.wood);
-        Part(PrimitiveType.Cube, "Shelf", model, new Vector3(0f, 0.25f, 0f), Vector3.zero, new Vector3(1.5f, 0.04f, 0.6f), m.woodDark);
-        for (int i = 0; i < 4; i++)
-        {
-            float x = (i % 2 == 0 ? -1f : 1f) * 0.72f, z = (i < 2 ? -1f : 1f) * 0.29f;
-            Part(PrimitiveType.Cube, "Leg " + (i + 1), model, new Vector3(x, 0.41f, z), Vector3.zero, new Vector3(0.08f, 0.82f, 0.08f), m.woodDark);
-        }
+        var holder = new GameObject("Model").transform;
+        holder.SetParent(root.transform, false);
+        var model = InstantiateKit("SurvivalKit/workbench", holder);
+        if (model != null) FitInside(model, holder, height: 0.95f);
+
+        var b = LocalBounds(holder);
+        var col = root.AddComponent<BoxCollider>();
+        col.center = b.size == Vector3.zero ? new Vector3(0f, 0.45f, 0f) : b.center;
+        col.size = b.size == Vector3.zero ? new Vector3(1.2f, 0.9f, 1.2f) : b.size;
 
         var point = new GameObject("Interact Point").transform;
         point.SetParent(root.transform, false);
-        point.localPosition = new Vector3(0f, 0f, 0.9f);
+        point.localPosition = new Vector3(0f, 0f, Mathf.Max(0.9f, b.extents.z + 0.5f));
         bench.interactPoint = point;
         return SavePrefab(root, path);
     }
@@ -452,7 +571,7 @@ public static class DigInSceneBuilder
         hud.promptText = Text("Text", prompt, font, shadow, 28f, TextAlignmentOptions.Center, "Press <b>E</b> to make a Garden Shovel",
             Vector2.zero, new Vector2(1200f, 60f), stretch: true);
 
-        // Messages and memory lines, lower centre.
+        // Messages, lower centre.
         var message = UiNode("Message", root.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(1300f, 220f));
         hud.messageGroup = message.gameObject.AddComponent<CanvasGroup>();
         hud.messageText = Text("Text", message, font, shadow, 34f, TextAlignmentOptions.Bottom, "Something is buried here.",
@@ -480,7 +599,7 @@ public static class DigInSceneBuilder
         bool changed = false;
         foreach (var t in root.GetComponentsInChildren<TMP_Text>(true))
         {
-            if (t.font == font) continue;
+            if (t.font != TMP_Settings.defaultFontAsset) continue;   // keep fonts chosen on purpose
             t.font = font;
             t.fontSharedMaterial = shadow;
             changed = true;
@@ -494,121 +613,139 @@ public static class DigInSceneBuilder
     }
 
     // ---- Lighting ------------------------------------------------------------
-    // Golden hour. Only applied the first time (when the scene does not use our sky yet),
-    // so later tweaks in the Lighting window are kept.
+    // Golden hour. Each part is applied once, so later tweaks in the Lighting window are kept.
     static void BuildLighting(Mats m)
     {
-        if (RenderSettings.skybox == m.sky) { report.AppendLine("  skipped lighting (already set)"); return; }
-
-        var sun = Object.FindObjectsByType<Light>().FirstOrDefault(l => l.type == LightType.Directional);
-        if (sun == null)
+        if (RenderSettings.skybox != m.sky)
         {
-            sun = new GameObject("Directional Light").AddComponent<Light>();
-            sun.type = LightType.Directional;
-        }
-        sun.name = "Sun";
-        sun.transform.rotation = Quaternion.Euler(14f, 120f, 0f);   // low, from the west-northwest
-        sun.color = new Color(1f, 0.76f, 0.52f);
-        sun.intensity = 1.8f;
-        sun.shadows = LightShadows.Soft;
-        sun.shadowStrength = 0.85f;
+            var sun = Object.FindObjectsByType<Light>().FirstOrDefault(l => l.type == LightType.Directional);
+            if (sun == null)
+            {
+                sun = new GameObject("Directional Light").AddComponent<Light>();
+                sun.type = LightType.Directional;
+            }
+            sun.name = "Sun";
+            sun.transform.rotation = Quaternion.Euler(14f, 120f, 0f);   // low, from the west-northwest
+            sun.color = new Color(1f, 0.76f, 0.52f);
+            sun.intensity = 1.8f;
+            sun.shadows = LightShadows.Soft;
+            sun.shadowStrength = 0.85f;
 
-        RenderSettings.sun = sun;
-        RenderSettings.skybox = m.sky;
-        RenderSettings.ambientMode = AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.62f, 0.55f, 0.52f);
-        RenderSettings.ambientEquatorColor = new Color(0.58f, 0.45f, 0.36f);
-        RenderSettings.ambientGroundColor = new Color(0.25f, 0.20f, 0.16f);
-        RenderSettings.fog = true;
-        RenderSettings.fogMode = FogMode.ExponentialSquared;
-        RenderSettings.fogColor = new Color(0.85f, 0.68f, 0.52f);
-        RenderSettings.fogDensity = 0.018f;
+            RenderSettings.sun = sun;
+            RenderSettings.skybox = m.sky;
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.62f, 0.55f, 0.52f);
+            RenderSettings.ambientEquatorColor = new Color(0.58f, 0.45f, 0.36f);
+            RenderSettings.ambientGroundColor = new Color(0.25f, 0.20f, 0.16f);
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = new Color(0.85f, 0.68f, 0.52f);
+            RenderSettings.fogDensity = 0.018f;
+            report.AppendLine("  set golden-hour lighting, sky and fog");
+        }
+
+        // The photographic HDRI would clash with the low-poly look as a visible sky, so it is
+        // only used for reflections. The visible sky stays procedural, and ambient stays
+        // Trilight because DigAtmosphere darkens it with depth.
+        if (RenderSettings.customReflectionTexture == null && File.Exists(HdriPath))
+        {
+            var importer = (TextureImporter)AssetImporter.GetAtPath(HdriPath);
+            if (importer.textureShape != TextureImporterShape.TextureCube)
+            {
+                importer.textureShape = TextureImporterShape.TextureCube;
+                importer.SaveAndReimport();
+            }
+            var cube = AssetDatabase.LoadAssetAtPath<Cubemap>(HdriPath);
+            if (cube != null)
+            {
+                RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+                RenderSettings.customReflectionTexture = cube;
+                RenderSettings.fogDensity = 0.013f;   // thinner, so the distant hills read
+                report.AppendLine("  using the Evening Field HDRI for reflections; thinner fog");
+            }
+        }
         DynamicGI.UpdateEnvironment();
-        report.AppendLine("  set golden-hour lighting, sky and fog");
     }
 
-    // ---- Scene ---------------------------------------------------------------
-    static void BuildScene(Scene scene, Mats m, Mesh wallMesh, MemoryData[] memories,
-                           GameObject playerPrefab, GameObject findPrefab, GameObject shelfPrefab,
-                           GameObject benchPrefab, GameObject hudPrefab)
+    // ---- Scene: shaft and hub -------------------------------------------------
+    static void BuildDigSite(Scene scene, Mats m, Mesh wallMesh)
     {
         float s = DigTerrain.Size;
+        var digSite = Root(scene, "Dig Site", out _);
 
-        // Dig site: the shaft floor (procedural), its walls, and the invisible earth around it.
-        var digSite = Root(scene, "Dig Site", out bool newSite);
-        if (newSite)
+        Ensure(digSite, "Shaft Floor", () =>
         {
             var floor = new GameObject("Shaft Floor", typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider));
-            floor.transform.SetParent(digSite, false);
             floor.GetComponent<MeshRenderer>().sharedMaterial = m.strata;
             floor.AddComponent<DigTerrain>();
+            return floor;
+        });
 
+        Ensure(digSite, "Shaft Walls", () =>
+        {
             var walls = new GameObject("Shaft Walls", typeof(MeshFilter), typeof(MeshRenderer));
-            walls.transform.SetParent(digSite, false);
             walls.GetComponent<MeshFilter>().sharedMesh = wallMesh;
             var wr = walls.GetComponent<MeshRenderer>();
             wr.sharedMaterial = m.strata;
             wr.shadowCastingMode = ShadowCastingMode.Off;
+            return walls;
+        });
 
-            // Colliders and shadow casters only: the visible walls are "Shaft Walls".
-            var earth = new GameObject("Shaft Earth").transform;
-            earth.SetParent(digSite, false);
-            const float w = 40f, h = 60f;
-            EarthBox("West", earth, new Vector3(-w / 2f, -h / 2f, s / 2f), new Vector3(w, h, s + 2f * w), m.earth);
-            EarthBox("East", earth, new Vector3(s + w / 2f, -h / 2f, s / 2f), new Vector3(w, h, s + 2f * w), m.earth);
-            EarthBox("South", earth, new Vector3(s / 2f, -h / 2f, -w / 2f), new Vector3(s, h, w), m.earth);
-            EarthBox("North", earth, new Vector3(s / 2f, -h / 2f, s + w / 2f), new Vector3(s, h, w), m.earth);
+        // Colliders and shadow casters only: the visible walls are "Shaft Walls".
+        Ensure(digSite, "Shaft Earth", () =>
+        {
+            var earth = new GameObject("Shaft Earth");
+            const float t = 2f, h = DigGame.TotalDepth + 2f;
+            EarthBox("West", earth.transform, new Vector3(-t / 2f, -h / 2f, s / 2f), new Vector3(t, h, s + 2f * t), m.earth);
+            EarthBox("East", earth.transform, new Vector3(s + t / 2f, -h / 2f, s / 2f), new Vector3(t, h, s + 2f * t), m.earth);
+            EarthBox("South", earth.transform, new Vector3(s / 2f, -h / 2f, -t / 2f), new Vector3(s, h, t), m.earth);
+            EarthBox("North", earth.transform, new Vector3(s / 2f, -h / 2f, s + t / 2f), new Vector3(s, h, t), m.earth);
+            return earth;
+        });
 
+        Ensure(digSite, "Safety Floor", () =>
+        {
             var bottom = new GameObject("Safety Floor").AddComponent<BoxCollider>();
-            bottom.transform.SetParent(digSite, false);
             bottom.transform.position = new Vector3(s / 2f, -DigGame.TotalDepth - 0.6f, s / 2f);
             bottom.size = new Vector3(s, 1f, s);
+            return bottom.gameObject;
+        });
 
+        Ensure(digSite, "Debris", () =>
+        {
             var debris = new GameObject("Debris").AddComponent<DigDebris>();
-            debris.transform.SetParent(digSite, false);
-            debris.terrain = floor.GetComponent<DigTerrain>();
+            debris.terrain = digSite.Find("Shaft Floor").GetComponent<DigTerrain>();
             debris.clodMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
             debris.materials = m.clods;
-        }
+            return debris.gameObject;
+        });
+    }
 
-        // Placeholder ground. Replaced by the imported environment later.
-        var ground = Root(scene, "Ground (placeholder)", out bool newGround);
-        if (newGround)
-        {
-            const float w = 40f, g = 0.1f;
-            Part(PrimitiveType.Cube, "Grass West", ground, new Vector3(-w / 2f, g / 2f, s / 2f), Vector3.zero, new Vector3(w, g, s + 2f * w), m.grass, collider: true);
-            Part(PrimitiveType.Cube, "Grass East", ground, new Vector3(s + w / 2f, g / 2f, s / 2f), Vector3.zero, new Vector3(w, g, s + 2f * w), m.grass, collider: true);
-            Part(PrimitiveType.Cube, "Grass South", ground, new Vector3(s / 2f, g / 2f, -w / 2f), Vector3.zero, new Vector3(s, g, w), m.grass, collider: true);
-            Part(PrimitiveType.Cube, "Grass North", ground, new Vector3(s / 2f, g / 2f, s + w / 2f), Vector3.zero, new Vector3(s, g, w), m.grass, collider: true);
-        }
+    // The yard in front of the house's back door: spawn, memory shelf, workbench lean-to.
+    static void BuildHub(Scene scene, GameObject shelfPrefab, GameObject benchPrefab)
+    {
+        var hub = Root(scene, "Surface Hub", out bool created);
+        if (!created) return;
 
-        // Surface hub: spawn, memory shelf (left), workbench (right), the shaft ahead.
-        var hub = Root(scene, "Surface Hub", out bool newHub);
-        if (newHub)
-        {
-            var spawn = new GameObject("Spawn Point").transform;
-            spawn.SetParent(hub, false);
-            spawn.position = new Vector3(2.5f, 1.1f, -3f);
+        var spawn = new GameObject("Spawn Point").transform;
+        spawn.SetParent(hub, false);
+        spawn.position = new Vector3(3f, 1f, -8f);
 
-            Instance(shelfPrefab, hub, new Vector3(-2.2f, 0.1f, -3.2f), 90f);
-            Instance(benchPrefab, hub, new Vector3(7.2f, 0.1f, -3.2f), -90f);
-        }
+        // Where the ending leaves you: looking at the shelf by the back door.
+        var endView = new GameObject("Ending View").transform;
+        endView.SetParent(hub, false);
+        endView.position = new Vector3(ShelfPos.x, 1f, ShelfPos.z + 3.6f);
+        endView.rotation = Quaternion.Euler(0f, 180f, 0f);
 
-        var player = Root(scene, "Player", out bool newPlayer, playerPrefab);
-        if (newPlayer) player.position = new Vector3(2.5f, 1.1f, -3f);
-        Root(scene, "HUD", out _, hudPrefab);
+        Instance(shelfPrefab, hub, ShelfPos, 0f);
 
-        // The template's camera is replaced by the one in the Player prefab.
-        foreach (var go in scene.GetRootGameObjects())
-        {
-            if (go.name == "Main Camera" && go.GetComponent<Camera>() != null)
-            {
-                Object.DestroyImmediate(go);
-                report.AppendLine("  removed the old Main Camera");
-            }
-        }
-
-        WireGame(scene, memories, findPrefab);
+        var leanTo = new GameObject("Lean-to").transform;
+        leanTo.SetParent(hub, false);
+        Instance(benchPrefab, leanTo, BenchPos, -90f);
+        Place(leanTo, "SurvivalKit/structure-roof", BenchPos, -90f, width: 3.4f);
+        Place(leanTo, "SurvivalKit/resource-planks", BenchPos + new Vector3(0.6f, 0f, 1.3f), 10f, width: 1.2f);
+        Place(leanTo, "SurvivalKit/tool-pickaxe", BenchPos + new Vector3(0.9f, 0f, -1.2f), 30f, height: 0.6f);
+        Lantern(leanTo, BenchPos + new Vector3(1.4f, 0f, 1.6f), 2.1f);
     }
 
     static void WireGame(Scene scene, MemoryData[] memories, GameObject findPrefab)
@@ -628,11 +765,8 @@ public static class DigInSceneBuilder
         if (game.hud == null) game.hud = Find<DigHud>(scene);
         if (game.workbench == null) game.workbench = Find<Workbench>(scene);
         if (game.shelf == null) game.shelf = Find<MemoryShelf>(scene);
-        if (game.spawnPoint == null)
-        {
-            var hub = scene.GetRootGameObjects().FirstOrDefault(g => g.name == "Surface Hub");
-            if (hub != null) game.spawnPoint = hub.transform.Find("Spawn Point");
-        }
+        var hub = FindRoot(scene, "Surface Hub");
+        if (game.spawnPoint == null && hub != null) game.spawnPoint = hub.Find("Spawn Point");
         if (game.memories == null || game.memories.Length == 0) game.memories = memories;
         if (game.findPrefab == null) game.findPrefab = findPrefab.GetComponent<MemoryFind>();
         EditorUtility.SetDirty(game);
@@ -681,6 +815,33 @@ public static class DigInSceneBuilder
             mat.SetFloat("_Smoothness", smoothness);
             mat.SetFloat("_Metallic", metallic);
             if (texture != null) mat.SetTexture("_BaseMap", texture);
+            return mat;
+        });
+    }
+
+    // The material a Kenney model was imported with (they share one colormap material per kit).
+    static Material KitMaterial(string kitModel)
+    {
+        string path = KenneyDir + "/" + kitModel + ".fbx";
+        var mat = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Material>().FirstOrDefault();
+        if (mat == null)
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            var r = go != null ? go.GetComponentInChildren<Renderer>() : null;
+            if (r != null) mat = r.sharedMaterial;
+        }
+        return mat;
+    }
+
+    static Material TintedMaterial(string name, Material source, Color tint, float smoothness, float metallic)
+    {
+        if (source == null) return null;
+        return LoadOrCreate(MatDir + "/" + name + ".mat", () =>
+        {
+            var mat = new Material(source);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", mat.GetColor("_BaseColor") * tint);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
             return mat;
         });
     }
@@ -748,7 +909,7 @@ public static class DigInSceneBuilder
 
         var t = rt.gameObject.AddComponent<TextMeshProUGUI>();
         t.font = font;
-        t.fontSharedMaterial = material;
+        if (material != null) t.fontSharedMaterial = material;
         t.fontSize = size;
         t.color = TextColor;
         t.alignment = align;
@@ -758,11 +919,25 @@ public static class DigInSceneBuilder
         return t;
     }
 
+    static Transform FindRoot(Scene scene, string name)
+    {
+        var go = scene.GetRootGameObjects().FirstOrDefault(g => g.name == name);
+        return go != null ? go.transform : null;
+    }
+
+    static void DestroyRoot(Scene scene, string name)
+    {
+        var t = FindRoot(scene, name);
+        if (t == null) return;
+        Object.DestroyImmediate(t.gameObject);
+        report.AppendLine("  removed scene/" + name + " (rebuilt below)");
+    }
+
     // Finds a root object by name, or creates it (empty, or from a prefab).
     static Transform Root(Scene scene, string name, out bool created, GameObject prefab = null)
     {
-        var existing = scene.GetRootGameObjects().FirstOrDefault(g => g.name == name);
-        if (existing != null) { created = false; Skipped("scene/" + name); return existing.transform; }
+        var existing = FindRoot(scene, name);
+        if (existing != null) { created = false; Skipped("scene/" + name); return existing; }
 
         GameObject go;
         if (prefab != null) go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
@@ -777,11 +952,24 @@ public static class DigInSceneBuilder
         return go.transform;
     }
 
-    static void Instance(GameObject prefab, Transform parent, Vector3 position, float yaw)
+    // Finds a child by name, or creates it with `create` and parents it (keeping world pose).
+    static Transform Ensure(Transform parent, string name, System.Func<GameObject> create)
+    {
+        var existing = parent.Find(name);
+        if (existing != null) return existing;
+        var go = create();
+        go.name = name;
+        go.transform.SetParent(parent, true);
+        Created("scene/" + parent.name + "/" + name);
+        return go.transform;
+    }
+
+    static GameObject Instance(GameObject prefab, Transform parent, Vector3 position, float yaw)
     {
         var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
         go.transform.position = position;
         go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        return go;
     }
 
     static T Find<T>(Scene scene) where T : Component

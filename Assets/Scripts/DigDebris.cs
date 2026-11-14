@@ -97,7 +97,7 @@ public class DigDebris : MonoBehaviour
                     p.z = Mathf.Clamp(p.z, 0.02f, DigTerrain.Size - 0.02f);
                     inShaft = true;
                 }
-                float ground = (inShaft ? terrain.HeightAt(p.x, p.z) : 0.1f) + shape[i].y * 0.5f;
+                float ground = (inShaft ? terrain.HeightAt(p.x, p.z) : 0.06f) + shape[i].y * 0.5f;
 
                 if (p.y < ground)
                 {
