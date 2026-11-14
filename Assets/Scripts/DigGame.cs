@@ -50,7 +50,6 @@ public class DigGame : MonoBehaviour
     // ---- State --------------------------------------------------------------
     public int scrap;
     public int shovelLevel;
-    public DigAudio Audio { get; private set; }
 
     DigPlayer player;
     DigTerrain terrain;
@@ -195,7 +194,6 @@ public class DigGame : MonoBehaviour
         cam.transform.localRotation = Quaternion.identity;
         cam.nearClipPlane = 0.05f;
 
-        Audio = cam.gameObject.AddComponent<DigAudio>();
 
         var shovelGo = new GameObject("Shovel");
         shovelGo.transform.SetParent(cam.transform, false);
@@ -215,7 +213,6 @@ public class DigGame : MonoBehaviour
         if (hit.collider != terrain.Collider)
         {
             // Grass or a shaft wall: not diggable.
-            Audio.Play(DigAudio.Sound.Thud, 0.5f);
             return false;
         }
 
@@ -232,17 +229,14 @@ public class DigGame : MonoBehaviour
         {
             if (shovelLevel < StratumCount - 1)
             {
-                Audio.Play(DigAudio.Sound.Clank, 0.8f);
                 debris.Burst(hit.point, hit.normal, toward, shovelLevel + 1, 4);
                 Say("This ground is too hard for the " + ShovelNames[shovelLevel] + ".");
                 return true;
             }
             // The very bottom ("today"). The ending will hook in here.
-            Audio.Play(DigAudio.Sound.Thud, 0.6f);
             return false;
         }
 
-        Audio.PlayHit(result.stratum);
         debris.Burst(hit.point, hit.normal, toward, result.stratum, 16);
         CheckFinds(hit.point);
         return false;
@@ -261,7 +255,6 @@ public class DigGame : MonoBehaviour
         if (found)
         {
             scrapFlash = 0.5f;
-            Audio.Play(DigAudio.Sound.Clink, 0.35f, 0.12f);
         }
     }
 
@@ -280,7 +273,6 @@ public class DigGame : MonoBehaviour
                 Mathf.Clamp(digPoint.z, margin, DigTerrain.Size - margin));
             find.obj = MakePart(PrimitiveType.Sphere, find.name, transform, pos, Vector3.zero, Vector3.zero, findMaterial).transform;
 
-            Audio.Play(DigAudio.Sound.Chime, 0.7f, 0f);
             debris.Burst(pos + Vector3.up * terrain.HeightAt(pos.x, pos.z), Vector3.up, Vector3.zero, TerrainStratum(pos), 12);
             Say("Something is buried here. Click it to pick it up.", 5f);
             break;   // one discovery per stroke
@@ -325,7 +317,6 @@ public class DigGame : MonoBehaviour
             Destroy(find.obj.gameObject);
             find.obj = null;
             find.taken = true;
-            Audio.Play(DigAudio.Sound.Pickup, 0.7f, 0f);
             // Placeholder until the illustrated memory card exists.
             Say(find.name + "\n\"" + find.line + "\"", 8f);
             return true;
@@ -352,7 +343,6 @@ public class DigGame : MonoBehaviour
         scrap -= cost;
         shovelLevel++;
         shovel.SetLevel(shovelLevel);
-        Audio.Play(DigAudio.Sound.Pickup, 0.6f, 0f);
         Say("You now have the " + ShovelNames[shovelLevel] + ".");
     }
 

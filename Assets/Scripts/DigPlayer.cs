@@ -149,7 +149,6 @@ public class DigPlayer : MonoBehaviour
             swinging = true;
             struck = false;
             swingTime = 0f;
-            DigGame.I.Audio.Play(DigAudio.Sound.Whoosh, 0.25f, 0.15f);
         }
         if (!swinging) return;
 

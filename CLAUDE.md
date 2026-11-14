@@ -37,6 +37,7 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
 - Claude cannot run Unity. After each change, briefly say what to check in Play mode.
 - Do not touch `Library/`, `Temp/` or `Logs/`.
 - All in-game text is in English.
+- **No sound.** Do not add any audio (procedural or files) until the developer explicitly asks for it.
 
 ## Current code
 
@@ -47,7 +48,6 @@ Everything is built at runtime; the scene only holds the "Game" object and the M
 - `Assets/Scripts/DigPlayer.cs`: first-person movement (acceleration, slope projection, sliding on steep slopes), look, swing timing, camera smoothing and kick.
 - `Assets/Scripts/DigShovel.cs`: first-person shovel models (one per level) and the keyframed swing.
 - `Assets/Scripts/DigDebris.cs`: pooled flying dirt clods, simulated by hand.
-- `Assets/Scripts/DigAudio.cs`: all sounds synthesised in code at startup.
 
 Notes:
 
@@ -63,8 +63,7 @@ Direction:
 - Replace the cube grid with a single deformable heightmap mesh for the shaft floor: 5 m x 5 m, about 0.25 m grid spacing. Each shovel stroke lowers the vertices around the aim point with a smooth falloff, leaving a rounded scoop. The shaft is vertical, so no overhangs are needed. Update the MeshCollider after each stroke.
 - Use vertex colors by depth to show dirt, clay and stone.
 - Implement "too hard for this shovel" by clamping how low vertices can go for the current shovel level.
-- Feel, in priority order: impact sound -> dirt particles and flying clumps -> a visible shovel with a swing animation -> camera kick -> object discovery moment.
-- Generate sounds procedurally in code if possible, so no audio files are needed.
+- Feel, in priority order: dirt particles and flying clumps -> a visible shovel with a swing animation -> camera kick -> object discovery moment.
 - Player movement should have acceleration and deceleration and handle the dug slopes smoothly.
 - Status: first pass implemented, needs Play mode tuning.
 - The cube version is committed (`7579305`), so we can revert if the new approach is not working within 2-3 hours.
@@ -106,7 +105,7 @@ Growing Up
 2. Three memory objects + card display
 3. Letters, shelf and ending, playable start to finish
 4. Remaining six objects
-5. Sound, particles, lighting polish
+5. Particles, lighting polish (sound only if the developer asks)
 6. Demo mode, bug fixes
 7. Build and Devpost submission
 
