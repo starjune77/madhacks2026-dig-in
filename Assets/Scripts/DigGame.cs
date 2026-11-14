@@ -7,32 +7,60 @@ public class DigGame : MonoBehaviour
     public static DigGame I { get; private set; }
 
     // ---- Tuning -------------------------------------------------------------
-    const int ShaftSize = 5;            // 5 x 5 cells
-    const int LayersPerStratum = 8;     // 3 strata -> 24 layers deep
-    const int StratumCount = 3;
-    const float ScrapChance = 0.35f;
+    public const int StratumCount = 3;
+    public const float StratumDepth = 8f;                       // metres per stratum
+    public const float TotalDepth = StratumCount * StratumDepth;
+
+    const float VolumePerScrap = 0.6f;   // cubic metres of earth dug per scrap found
 
     static readonly string[] StratumNames = { "Childhood", "School Days", "Growing Up" };
-    static readonly float[] BlockHp = { 3f, 9f, 24f };
-    static readonly Color[] BlockColors =
+    static readonly Color[] StrataColors =
     {
         new Color(0.55f, 0.38f, 0.24f),   // dirt
         new Color(0.70f, 0.42f, 0.28f),   // clay
         new Color(0.45f, 0.45f, 0.48f),   // stone
+        new Color(0.92f, 0.90f, 0.84f),   // today (the very bottom)
     };
 
     static readonly string[] ShovelNames = { "Toy Shovel", "Garden Shovel", "Steel Shovel" };
-    static readonly float[] ShovelDamage = { 1f, 3f, 8f };
+    static readonly float[] ShovelPower = { 1f, 2f, 4f };       // compared against stratum hardness
+    static readonly float[] ShovelRadius = { 0.8f, 0.9f, 1.0f };
     static readonly int[] UpgradeCost = { 8, 20 };   // cost to reach level 1, level 2
 
     static readonly Vector3 SpawnPoint = new Vector3(2.5f, 1.1f, -3f);
 
+    // Memory objects. Each one turns up wherever you are digging when you first
+    // reach its depth, so the demo is reproducible but nothing can be missed.
+    class Find
+    {
+        public string name, line;
+        public float depth;
+        public Transform obj;      // placeholder visual while it lies in the dirt
+        public float age;
+        public bool spawned, taken;
+    }
+
+    readonly Find[] finds =
+    {
+        new Find { depth = 2.5f, name = "Bicycle Bell", line = "Someone was holding the back of the seat. I didn't notice when they let go." },
+        new Find { depth = 5.0f, name = "Crayon",       line = "I drew a house with four windows. The real house only had two." },
+        new Find { depth = 7.2f, name = "Toy Car",      line = "One wheel was missing, but I still raced it across the kitchen floor." },
+    };
+
     // ---- State --------------------------------------------------------------
     public int scrap;
     public int shovelLevel;
+    public DigAudio Audio { get; private set; }
 
     DigPlayer player;
+    DigTerrain terrain;
+    DigDebris debris;
+    DigShovel shovel;
     Material baseMaterial;
+    Mesh cubeMesh;
+    Material findMaterial;
+    float scrapProgress;
+    float scrapFlash;
     string message = "";
     float messageTimer;
 
@@ -40,24 +68,41 @@ public class DigGame : MonoBehaviour
     {
         I = this;
         BuildYard();
-        BuildShaft();
+        BuildTerrain();
         BuildPlayer();
     }
 
     // ---- World --------------------------------------------------------------
-    Material MakeMaterial(Color color)
+    public Material MakeMaterial(Color color, float smoothness = 0.1f)
     {
         if (baseMaterial == null)
         {
             // Borrow the default lit material from a primitive so this also works in builds.
             var temp = GameObject.CreatePrimitive(PrimitiveType.Cube);
             baseMaterial = temp.GetComponent<Renderer>().sharedMaterial;
-            Destroy(temp);
+            cubeMesh = temp.GetComponent<MeshFilter>().sharedMesh;
+            DestroyImmediate(temp);
         }
         var mat = new Material(baseMaterial);
         if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+        if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
         mat.color = color;
         return mat;
+    }
+
+    // A primitive used only for looks (no collider), e.g. shovel parts.
+    public GameObject MakePart(PrimitiveType type, string name, Transform parent,
+                               Vector3 localPos, Vector3 localEuler, Vector3 localScale, Material mat)
+    {
+        var go = GameObject.CreatePrimitive(type);
+        DestroyImmediate(go.GetComponent<Collider>());
+        go.name = name;
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPos;
+        go.transform.localEulerAngles = localEuler;
+        go.transform.localScale = localScale;
+        go.GetComponent<Renderer>().sharedMaterial = mat;
+        return go;
     }
 
     GameObject MakeBox(string name, Vector3 center, Vector3 size, Material mat)
@@ -73,18 +118,23 @@ public class DigGame : MonoBehaviour
 
     void BuildYard()
     {
-        float s = ShaftSize;
-        float totalDepth = LayersPerStratum * StratumCount;
+        float s = DigTerrain.Size;
         var earth = MakeMaterial(new Color(0.36f, 0.26f, 0.18f));
         var grass = MakeMaterial(new Color(0.35f, 0.55f, 0.30f));
 
-        // Four big earth boxes around the shaft: they are the pit walls.
+        // Four big earth boxes around the shaft: they are the pit walls. They only
+        // collide and cast shadows; the visible, layered walls are drawn by DigTerrain.
         const float w = 40f;      // how far the yard extends
         const float h = 60f;      // how deep the walls go
-        MakeBox("Earth West",  new Vector3(-w / 2f,     -h / 2f, s / 2f),      new Vector3(w, h, s + 2f * w), earth);
-        MakeBox("Earth East",  new Vector3(s + w / 2f,  -h / 2f, s / 2f),      new Vector3(w, h, s + 2f * w), earth);
-        MakeBox("Earth South", new Vector3(s / 2f,      -h / 2f, -w / 2f),     new Vector3(s, h, w),          earth);
-        MakeBox("Earth North", new Vector3(s / 2f,      -h / 2f, s + w / 2f),  new Vector3(s, h, w),          earth);
+        var boxes = new[]
+        {
+            MakeBox("Earth West",  new Vector3(-w / 2f,     -h / 2f, s / 2f),      new Vector3(w, h, s + 2f * w), earth),
+            MakeBox("Earth East",  new Vector3(s + w / 2f,  -h / 2f, s / 2f),      new Vector3(w, h, s + 2f * w), earth),
+            MakeBox("Earth South", new Vector3(s / 2f,      -h / 2f, -w / 2f),     new Vector3(s, h, w),          earth),
+            MakeBox("Earth North", new Vector3(s / 2f,      -h / 2f, s + w / 2f),  new Vector3(s, h, w),          earth),
+        };
+        foreach (var box in boxes)
+            box.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
 
         // Thin grass slabs on top so the surface reads as a yard.
         const float g = 0.1f;
@@ -93,36 +143,31 @@ public class DigGame : MonoBehaviour
         MakeBox("Grass South", new Vector3(s / 2f,      g / 2f, -w / 2f),     new Vector3(s, g, w),          grass);
         MakeBox("Grass North", new Vector3(s / 2f,      g / 2f, s + w / 2f),  new Vector3(s, g, w),          grass);
 
-        // The floor under the last layer: "today". Not diggable yet.
-        var floor = MakeMaterial(new Color(0.92f, 0.90f, 0.84f));
-        MakeBox("Today Floor", new Vector3(s / 2f, -totalDepth - 0.5f, s / 2f), new Vector3(s, 1f, s), floor);
+        // Safety floor just under the deepest the terrain can go.
+        MakeBox("Safety Floor", new Vector3(s / 2f, -TotalDepth - 0.6f, s / 2f), new Vector3(s, 1f, s), earth);
     }
 
-    void BuildShaft()
+    void BuildTerrain()
     {
-        var mats = new Material[StratumCount];
-        for (int i = 0; i < StratumCount; i++) mats[i] = MakeMaterial(BlockColors[i]);
+        var strata = MakeMaterial(Color.white, 0.05f);
+        var tex = DigTerrain.MakeStrataTexture(StrataColors);
+        if (strata.HasProperty("_BaseMap")) strata.SetTexture("_BaseMap", tex);
+        strata.mainTexture = tex;
 
-        var parent = new GameObject("Shaft").transform;
-        parent.SetParent(transform);
+        var go = new GameObject("Terrain");
+        go.transform.SetParent(transform, false);
+        terrain = go.AddComponent<DigTerrain>();
+        terrain.Build(strata);
 
-        int totalLayers = LayersPerStratum * StratumCount;
-        for (int layer = 0; layer < totalLayers; layer++)
-        {
-            int stratum = layer / LayersPerStratum;
-            for (int x = 0; x < ShaftSize; x++)
-            {
-                for (int z = 0; z < ShaftSize; z++)
-                {
-                    var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    go.name = "Block " + layer + " (" + x + "," + z + ")";
-                    go.transform.SetParent(parent);
-                    go.transform.position = new Vector3(x + 0.5f, -layer - 0.5f, z + 0.5f);
-                    go.GetComponent<Renderer>().sharedMaterial = mats[stratum];
-                    go.AddComponent<DigBlock>().Init(layer, stratum, BlockHp[stratum]);
-                }
-            }
-        }
+        var clodMaterials = new Material[StratumCount];
+        for (int i = 0; i < StratumCount; i++) clodMaterials[i] = MakeMaterial(StrataColors[i] * 0.9f, 0.05f);
+
+        var debrisGo = new GameObject("Debris");
+        debrisGo.transform.SetParent(transform, false);
+        debris = debrisGo.AddComponent<DigDebris>();
+        debris.Build(terrain, clodMaterials, cubeMesh);
+
+        findMaterial = MakeMaterial(new Color(0.98f, 0.80f, 0.35f), 0.6f);
     }
 
     void BuildPlayer()
@@ -134,6 +179,7 @@ public class DigGame : MonoBehaviour
         cc.height = 1.8f;
         cc.radius = 0.35f;
         cc.stepOffset = 0.3f;
+        cc.slopeLimit = 50f;
 
         // Reuse the scene's Main Camera so its URP settings are kept.
         Camera cam = Camera.main;
@@ -145,33 +191,149 @@ public class DigGame : MonoBehaviour
             camGo.AddComponent<AudioListener>();
         }
         cam.transform.SetParent(go.transform);
-        cam.transform.localPosition = new Vector3(0f, 0.7f, 0f);
+        cam.transform.localPosition = new Vector3(0f, DigPlayer.EyeHeight, 0f);
         cam.transform.localRotation = Quaternion.identity;
         cam.nearClipPlane = 0.05f;
 
+        Audio = cam.gameObject.AddComponent<DigAudio>();
+
+        var shovelGo = new GameObject("Shovel");
+        shovelGo.transform.SetParent(cam.transform, false);
+        shovel = shovelGo.AddComponent<DigShovel>();
+        shovel.Build(this);
+
         player = go.AddComponent<DigPlayer>();
         player.cam = cam.transform;
+        player.shovel = shovel;
     }
 
     // ---- Rules --------------------------------------------------------------
-    public void HitBlock(DigBlock block)
+    // Called by the player when the shovel lands. Returns true if the shovel bounced
+    // off ground that is too hard.
+    public bool Strike(RaycastHit hit, Vector3 playerPosition)
     {
-        if (block.stratum > shovelLevel)
+        if (hit.collider != terrain.Collider)
         {
-            Say("This ground is too hard for the " + ShovelNames[shovelLevel] + ".");
-            return;
+            // Grass or a shaft wall: not diggable.
+            Audio.Play(DigAudio.Sound.Thud, 0.5f);
+            return false;
         }
 
-        if (block.Hit(ShovelDamage[shovelLevel]))
+        Vector3 toward = playerPosition - hit.point;
+        toward.y = 0f;
+        toward.Normalize();
+
+        float floor = -(shovelLevel + 1) * StratumDepth;
+        var result = terrain.Dig(hit.point, ShovelRadius[shovelLevel], ShovelPower[shovelLevel], floor);
+
+        AddScrap(result.volume);
+
+        if (result.hitFloor)
         {
-            Destroy(block.gameObject);
-            if (Random.value < ScrapChance)
+            if (shovelLevel < StratumCount - 1)
             {
-                scrap++;
+                Audio.Play(DigAudio.Sound.Clank, 0.8f);
+                debris.Burst(hit.point, hit.normal, toward, shovelLevel + 1, 4);
+                Say("This ground is too hard for the " + ShovelNames[shovelLevel] + ".");
+                return true;
             }
+            // The very bottom ("today"). The ending will hook in here.
+            Audio.Play(DigAudio.Sound.Thud, 0.6f);
+            return false;
+        }
+
+        Audio.PlayHit(result.stratum);
+        debris.Burst(hit.point, hit.normal, toward, result.stratum, 16);
+        CheckFinds(hit.point);
+        return false;
+    }
+
+    void AddScrap(float volume)
+    {
+        scrapProgress += volume;
+        bool found = false;
+        while (scrapProgress >= VolumePerScrap)
+        {
+            scrapProgress -= VolumePerScrap;
+            scrap++;
+            found = true;
+        }
+        if (found)
+        {
+            scrapFlash = 0.5f;
+            Audio.Play(DigAudio.Sound.Clink, 0.35f, 0.12f);
         }
     }
 
+    // ---- Memory objects ---------------------------------------------------------
+    void CheckFinds(Vector3 digPoint)
+    {
+        float depth = -terrain.HeightAt(digPoint.x, digPoint.z);
+        foreach (var find in finds)
+        {
+            if (find.spawned || depth < find.depth) continue;
+
+            find.spawned = true;
+            float margin = 0.6f;
+            var pos = new Vector3(
+                Mathf.Clamp(digPoint.x, margin, DigTerrain.Size - margin), 0f,
+                Mathf.Clamp(digPoint.z, margin, DigTerrain.Size - margin));
+            find.obj = MakePart(PrimitiveType.Sphere, find.name, transform, pos, Vector3.zero, Vector3.zero, findMaterial).transform;
+
+            Audio.Play(DigAudio.Sound.Chime, 0.7f, 0f);
+            debris.Burst(pos + Vector3.up * terrain.HeightAt(pos.x, pos.z), Vector3.up, Vector3.zero, TerrainStratum(pos), 12);
+            Say("Something is buried here. Click it to pick it up.", 5f);
+            break;   // one discovery per stroke
+        }
+    }
+
+    int TerrainStratum(Vector3 pos)
+    {
+        return DigTerrain.StratumAt(-terrain.HeightAt(pos.x, pos.z));
+    }
+
+    void UpdateFinds()
+    {
+        foreach (var find in finds)
+        {
+            if (find.obj == null) continue;
+            find.age += Time.deltaTime;
+
+            // Pops out of the dirt with a little overshoot, then rests on the dug surface.
+            float t = Mathf.Clamp01(find.age / 0.4f);
+            float pop = 1f + 0.35f * Mathf.Sin(t * Mathf.PI) * (1f - t);
+            float size = 0.24f * Mathf.SmoothStep(0f, 1f, t) * pop;
+            Vector3 p = find.obj.position;
+            p.y = terrain.HeightAt(p.x, p.z) + 0.10f + Mathf.Sin(find.age * 2.5f) * 0.02f;
+            find.obj.position = p;
+            find.obj.localScale = Vector3.one * size;
+        }
+    }
+
+    // Picks up a found object if the ray points at one. Returns true if it did.
+    public bool TryPickUp(Ray ray, float reach)
+    {
+        foreach (var find in finds)
+        {
+            if (find.obj == null) continue;
+
+            Vector3 to = find.obj.position - ray.origin;
+            float along = Vector3.Dot(to, ray.direction);
+            if (along < 0f || along > reach + 0.3f) continue;
+            if ((to - ray.direction * along).sqrMagnitude > 0.35f * 0.35f) continue;
+
+            Destroy(find.obj.gameObject);
+            find.obj = null;
+            find.taken = true;
+            Audio.Play(DigAudio.Sound.Pickup, 0.7f, 0f);
+            // Placeholder until the illustrated memory card exists.
+            Say(find.name + "\n\"" + find.line + "\"", 8f);
+            return true;
+        }
+        return false;
+    }
+
+    // ---- Shovel, travel, messages -----------------------------------------------
     public void TryUpgrade()
     {
         if (shovelLevel >= ShovelNames.Length - 1)
@@ -189,6 +351,8 @@ public class DigGame : MonoBehaviour
 
         scrap -= cost;
         shovelLevel++;
+        shovel.SetLevel(shovelLevel);
+        Audio.Play(DigAudio.Sound.Pickup, 0.6f, 0f);
         Say("You now have the " + ShovelNames[shovelLevel] + ".");
     }
 
@@ -197,15 +361,17 @@ public class DigGame : MonoBehaviour
         player.Teleport(SpawnPoint);
     }
 
-    public void Say(string text)
+    public void Say(string text, float seconds = 3f)
     {
         message = text;
-        messageTimer = 3f;
+        messageTimer = seconds;
     }
 
     void Update()
     {
         if (messageTimer > 0f) messageTimer -= Time.deltaTime;
+        if (scrapFlash > 0f) scrapFlash -= Time.deltaTime;
+        UpdateFinds();
     }
 
     // ---- Temporary HUD (replace with real UI later) --------------------------
@@ -214,15 +380,17 @@ public class DigGame : MonoBehaviour
         var label = new GUIStyle(GUI.skin.label) { fontSize = 22 };
         label.normal.textColor = Color.white;
 
-        float depth = Mathf.Max(0f, -(player.transform.position.y - 0.9f));
-        int stratum = Mathf.Clamp((int)(depth / LayersPerStratum), 0, StratumCount - 1);
+        float depth = Mathf.Max(0f, -(player.transform.position.y - 0.98f));
+        int stratum = Mathf.Clamp((int)(depth / StratumDepth), 0, StratumCount - 1);
 
         GUI.Label(new Rect(20, 15, 600, 30), "Depth: " + depth.ToString("0.0") + " m   (" + StratumNames[stratum] + ")", label);
         GUI.Label(new Rect(20, 45, 600, 30), "Shovel: " + ShovelNames[shovelLevel], label);
 
         string scrapLine = "Scrap: " + scrap;
         if (shovelLevel < UpgradeCost.Length) scrapLine += " / " + UpgradeCost[shovelLevel] + "   [E] upgrade";
-        GUI.Label(new Rect(20, 75, 600, 30), scrapLine, label);
+        var scrapStyle = new GUIStyle(label);
+        if (scrapFlash > 0f) scrapStyle.normal.textColor = new Color(1f, 0.85f, 0.3f);
+        GUI.Label(new Rect(20, 75, 600, 30), scrapLine, scrapStyle);
 
         var hint = new GUIStyle(label) { fontSize = 16 };
         GUI.Label(new Rect(20, Screen.height - 35, 900, 30),
@@ -234,7 +402,12 @@ public class DigGame : MonoBehaviour
 
         if (messageTimer > 0f)
         {
-            GUI.Label(new Rect(0, Screen.height * 0.7f, Screen.width, 40), message, center);
+            var text = new GUIStyle(label) { alignment = TextAnchor.UpperCenter, wordWrap = true };
+            var rect = new Rect(Screen.width * 0.15f, Screen.height * 0.68f, Screen.width * 0.7f, 140f);
+            text.normal.textColor = Color.black;
+            GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), message, text);
+            text.normal.textColor = Color.white;
+            GUI.Label(rect, message, text);
         }
     }
 }

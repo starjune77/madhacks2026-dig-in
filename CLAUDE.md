@@ -40,9 +40,19 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
 
 ## Current code
 
-- `Assets/Scripts/DigGame.cs`: attached to the "Game" object in SampleScene. Builds the yard, the shaft and the player at runtime. Holds scrap and shovel level. Temporary OnGUI HUD.
-- `Assets/Scripts/DigPlayer.cs`: first-person movement, look, dig input.
-- `Assets/Scripts/DigBlock.cs`: one cube block with HP.
+Everything is built at runtime; the scene only holds the "Game" object and the Main Camera.
+
+- `Assets/Scripts/DigGame.cs`: attached to the "Game" object in SampleScene. Builds the yard, the terrain and the player. Holds the rules and state: scrap, shovel level, memory objects, strike handling. All tuning constants (stratum depth, shovel power/radius, upgrade costs) are at the top. Temporary OnGUI HUD.
+- `Assets/Scripts/DigTerrain.cs`: the shaft floor as a 21 x 21 heightmap mesh (5 m, 0.25 m cells). `Dig()` lowers vertices with a flat core and smooth rim, clamped to the current shovel's floor, then rebuilds the MeshCollider. Also draws the layered shaft walls.
+- `Assets/Scripts/DigPlayer.cs`: first-person movement (acceleration, slope projection, sliding on steep slopes), look, swing timing, camera smoothing and kick.
+- `Assets/Scripts/DigShovel.cs`: first-person shovel models (one per level) and the keyframed swing.
+- `Assets/Scripts/DigDebris.cs`: pooled flying dirt clods, simulated by hand.
+- `Assets/Scripts/DigAudio.cs`: all sounds synthesised in code at startup.
+
+Notes:
+
+- Strata colours use a generated gradient texture looked up by depth (UV.y), not vertex colours: the default URP Lit material ignores vertex colours, and a custom shader would need `Shader.Find` or untested HLSL.
+- Memory objects appear at fixed depths, at whatever spot the player is digging when they first reach that depth. Picking one up currently shows its line as HUD text (placeholder for the card).
 
 ## Digging feel (roadmap step 1)
 
@@ -56,6 +66,7 @@ Direction:
 - Feel, in priority order: impact sound -> dirt particles and flying clumps -> a visible shovel with a swing animation -> camera kick -> object discovery moment.
 - Generate sounds procedurally in code if possible, so no audio files are needed.
 - Player movement should have acceleration and deceleration and handle the dug slopes smoothly.
+- Status: first pass implemented, needs Play mode tuning.
 - The cube version is committed (`7579305`), so we can revert if the new approach is not working within 2-3 hours.
 
 ## Demo mode (required later)
