@@ -28,6 +28,8 @@ public class DigGame : MonoBehaviour
     [Header("Memories (in shelf order)")]
     public MemoryData[] memories;
     public MemoryFind findPrefab;
+    [Tooltip("Optional find prefab per stratum; empty entries use findPrefab.")]
+    public MemoryFind[] findPrefabsByStratum;
 
     [Header("Shovels")]
     public string[] shovelNames = { "Toy Shovel", "Garden Shovel", "Steel Shovel" };
@@ -125,7 +127,10 @@ public class DigGame : MonoBehaviour
                 Mathf.Clamp(digPoint.z, margin, DigTerrain.Size - margin));
             pos.y = terrain.HeightAt(pos.x, pos.z);
 
-            liveFinds[i] = Instantiate(findPrefab, pos, Quaternion.identity);
+            int s = memories[i].stratum;
+            var prefab = findPrefabsByStratum != null && s < findPrefabsByStratum.Length && findPrefabsByStratum[s] != null
+                ? findPrefabsByStratum[s] : findPrefab;
+            liveFinds[i] = Instantiate(prefab, pos, Quaternion.identity);
             liveFinds[i].Init(memories[i], terrain);
 
             debris.Burst(pos, Vector3.up, Vector3.zero, DigTerrain.StratumAt(-pos.y), 12);

@@ -78,7 +78,12 @@ public static partial class DigInSceneBuilder
 
         var rebuilt = new HashSet<string>();
         var playerPrefab = BuildPlayerPrefab(m, rebuilt);
-        var findPrefab = BuildFindPrefab(rebuilt);
+        var findPrefabs = new[]
+        {
+            BuildFindPrefab("Memory Find", "FurnitureKit/cardboardBoxClosed", 0.26f, rebuilt),      // Childhood: a toy box
+            BuildFindPrefab("Memory Find School", "FurnitureKit/books", 0.22f, rebuilt),            // School Days
+            BuildFindPrefab("Memory Find Growing Up", "SurvivalKit/chest", 0.3f, rebuilt),          // Growing Up
+        };
         var shelfPrefab = BuildShelfPrefab(m, font, rebuilt);
         var benchPrefab = BuildWorkbenchPrefab(rebuilt);
         var hudPrefab = BuildHudPrefab(font, italic, rebuilt);
@@ -105,7 +110,7 @@ public static partial class DigInSceneBuilder
             }
         }
 
-        WireGame(scene, memories, letters, findPrefab);
+        WireGame(scene, memories, letters, findPrefabs);
         DeleteUnusedAssets();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -440,13 +445,13 @@ public static partial class DigInSceneBuilder
         return holder;
     }
 
-    static GameObject BuildFindPrefab(HashSet<string> rebuilt)
+    static GameObject BuildFindPrefab(string name, string kitModel, float height, HashSet<string> rebuilt)
     {
-        string path = PrefabDir + "/Memory Find.prefab";
+        string path = PrefabDir + "/" + name + ".prefab";
         var current = CurrentPrefab(path, FindVersion, "Find", rebuilt);
         if (current != null) return current;
 
-        var root = new GameObject("Memory Find");
+        var root = new GameObject(name);
         AddMarker(root, FindVersion);
         var col = root.AddComponent<SphereCollider>();
         col.isTrigger = true;
@@ -456,11 +461,11 @@ public static partial class DigInSceneBuilder
         find.size = 1f;
         find.hover = 0.02f;
 
-        // A small closed cardboard box: something someone kept.
+        // Something someone kept: a small box, a stack of books, a chest.
         var holder = new GameObject("Model").transform;
         holder.SetParent(root.transform, false);
-        var box = InstantiateKit("FurnitureKit/cardboardBoxClosed", holder);
-        if (box != null) FitInside(box, holder, height: 0.26f);
+        var model = InstantiateKit(kitModel, holder);
+        if (model != null) FitInside(model, holder, height: height);
         find.model = holder;
 
         var glowGo = new GameObject("Glow");
@@ -895,7 +900,7 @@ public static partial class DigInSceneBuilder
         Lantern(leanTo, BenchPos + new Vector3(1.4f, 0f, 1.6f), 2.1f);
     }
 
-    static void WireGame(Scene scene, MemoryData[] memories, LetterData[] letters, GameObject findPrefab)
+    static void WireGame(Scene scene, MemoryData[] memories, LetterData[] letters, GameObject[] findPrefabs)
     {
         var gameRoot = Root(scene, "Game", out _);
         // Not "??": Unity's fake-null objects defeat it.
@@ -917,7 +922,9 @@ public static partial class DigInSceneBuilder
         var hub = FindRoot(scene, "Surface Hub");
         if (game.spawnPoint == null && hub != null) game.spawnPoint = hub.Find("Spawn Point");
         if (game.memories == null || game.memories.Length == 0) game.memories = memories;
-        if (game.findPrefab == null) game.findPrefab = findPrefab.GetComponent<MemoryFind>();
+        if (game.findPrefab == null) game.findPrefab = findPrefabs[0].GetComponent<MemoryFind>();
+        if (game.findPrefabsByStratum == null || game.findPrefabsByStratum.Length == 0)
+            game.findPrefabsByStratum = findPrefabs.Select(f => f.GetComponent<MemoryFind>()).ToArray();
         if (game.story == null) game.story = story;
         EditorUtility.SetDirty(game);
 
