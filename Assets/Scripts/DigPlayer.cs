@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// First-person movement, looking, and the dig swing. Created at runtime by DigGame.
+// First-person movement, looking, and the dig swing. Lives on the Player prefab.
 [RequireComponent(typeof(CharacterController))]
 public class DigPlayer : MonoBehaviour
 {
@@ -39,10 +39,14 @@ public class DigPlayer : MonoBehaviour
     float kickPitch;
     float kickRoll;
 
-    void Start()
+    void Awake()
     {
         cc = GetComponent<CharacterController>();
         eyeY = transform.position.y + EyeHeight;
+    }
+
+    void Start()
+    {
         LockCursor(true);
     }
 
@@ -69,7 +73,7 @@ public class DigPlayer : MonoBehaviour
         UpdateCamera();
 
         if (kb.rKey.wasPressedThisFrame) DigGame.I.ReturnToSurface();
-        if (kb.eKey.wasPressedThisFrame) DigGame.I.TryUpgrade();
+        if (kb.eKey.wasPressedThisFrame) DigGame.I.Interact();
     }
 
     void Look(Mouse mouse)
@@ -153,7 +157,7 @@ public class DigPlayer : MonoBehaviour
         if (!swinging) return;
 
         swingTime += Time.deltaTime;
-        if (!struck && swingTime >= SwingDuration * DigShovel.ImpactT)
+        if (!struck && swingTime >= SwingDuration * shovel.impactT)
         {
             struck = true;
             Strike();

@@ -31,28 +31,46 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
 
 ## Conventions
 
+- **Assets over code. Code draws only what must be procedural.** Code generates only the deformable heightmap terrain (and its strata texture lookup), the dirt debris, and runtime state. Everything else (environment, props, shovel, player, hub, UI, lighting) is real Unity content: GameObjects saved in SampleScene, prefabs, materials and textures in `Assets/`, UI as a UGUI Canvas, all editable in the editor. Runtime code references them through serialized fields and never creates them.
+- Because Claude cannot click in the editor, persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. New content goes into that script, not into runtime code.
+- **No sound.** Do not add any audio (procedural or files) until the developer explicitly asks for it.
 - Use only the new Input System (`Keyboard.current`, `Mouse.current`). The legacy `Input` class throws errors in this project.
-- Do not create materials with `Shader.Find` (it can be stripped from builds). Clone the default primitive material and set `_BaseColor` (see `DigGame.MakeMaterial`).
-- Keep manual editor setup to a minimum and build things from code where possible. If a manual step is required, give exact steps.
-- Claude cannot run Unity. After each change, briefly say what to check in Play mode.
+- Never call `Shader.Find` at runtime (shaders can be stripped from builds). In editor scripts it is fine, because the saved material asset keeps a hard reference to its shader.
+- Text uses TextMesh Pro. The setup script imports the TMP Essential Resources if they are missing.
+- Keep manual editor setup to a minimum. If a manual step is required, give exact steps.
+- Claude cannot run Unity. After each change, say exactly what to run in the editor and what to check in Play mode.
 - Do not touch `Library/`, `Temp/` or `Logs/`.
 - All in-game text is in English.
-- **No sound.** Do not add any audio (procedural or files) until the developer explicitly asks for it.
 
-## Current code
+## Project layout
 
-Everything is built at runtime; the scene only holds the "Game" object and the Main Camera.
-
-- `Assets/Scripts/DigGame.cs`: attached to the "Game" object in SampleScene. Builds the yard, the terrain and the player. Holds the rules and state: scrap, shovel level, memory objects, strike handling. All tuning constants (stratum depth, shovel power/radius, upgrade costs) are at the top. Temporary OnGUI HUD.
-- `Assets/Scripts/DigTerrain.cs`: the shaft floor as a 21 x 21 heightmap mesh (5 m, 0.25 m cells). `Dig()` lowers vertices with a flat core and smooth rim, clamped to the current shovel's floor, then rebuilds the MeshCollider. Also draws the layered shaft walls.
-- `Assets/Scripts/DigPlayer.cs`: first-person movement (acceleration, slope projection, sliding on steep slopes), look, swing timing, camera smoothing and kick.
-- `Assets/Scripts/DigShovel.cs`: first-person shovel models (one per level) and the keyframed swing.
-- `Assets/Scripts/DigDebris.cs`: pooled flying dirt clods, simulated by hand.
+- `Assets/Scripts/`: runtime code.
+  - `DigGame.cs` (on "Game"): rules and state (scrap, shovel level, memory finds, strike handling, workbench interaction). Tuning values are serialized fields.
+  - `DigTerrain.cs` (on "Dig Site/Shaft Floor", must stay at the world origin): the 21 x 21 heightmap (5 m, 0.25 m cells). `Dig()` lowers vertices with a flat core and smooth rim, clamped to the current shovel's floor, then rebuilds the MeshCollider. Static helpers make the strata texture and the shaft wall mesh for the setup script. **The digging deformation is approved; do not change it.**
+  - `DigPlayer.cs` (Player prefab): movement with acceleration, slope projection, sliding on steep slopes, look, swing timing, camera smoothing and kick.
+  - `DigShovel.cs` (Player prefab, under the camera): one model per shovel level, keyframed swing (keys editable in the inspector).
+  - `DigDebris.cs` (on "Dig Site/Debris"): pooled flying dirt clods, simulated by hand.
+  - `DigHud.cs` (HUD prefab): updates the Canvas UI. Controls hint fades out after a few seconds.
+  - `DigAtmosphere.cs` (on "Game"): dimmer, warmer ambient light and fog with depth; drives the lantern light on the player.
+  - `MemoryData.cs`: ScriptableObject per memory (title, line, depth, stratum, card sprite). Assets in `Assets/Data/Memories/`.
+  - `MemoryFind.cs` (Memory Find prefab): a found object lying in the dirt.
+  - `MemoryShelf.cs` (Memory Shelf prefab): nine slots, rows top to bottom = Childhood, School Days, Growing Up.
+  - `Workbench.cs` (Workbench prefab): upgrade spot. Walk up and press E.
+- `Assets/Editor/DigInSceneBuilder.cs`: the setup script.
+- `Assets/Materials`, `Assets/Textures`, `Assets/Meshes`, `Assets/Prefabs`, `Assets/Data`, `Assets/Fonts`: content made by the setup script, then edited by hand.
+- `Assets/ThirdParty/`: imported art packs (see Art below). Do not edit files there; make prefab variants instead.
 
 Notes:
 
-- Strata colours use a generated gradient texture looked up by depth (UV.y), not vertex colours: the default URP Lit material ignores vertex colours, and a custom shader would need `Shader.Find` or untested HLSL.
-- Memory objects appear at fixed depths, at whatever spot the player is digging when they first reach that depth. Picking one up currently shows its line as HUD text (placeholder for the card).
+- Strata colours use a gradient texture looked up by depth (UV.y), not vertex colours: the default URP Lit material ignores vertex colours.
+- Memory objects appear at fixed depths, at whatever spot the player is digging when they first reach that depth. Picking one up fills its shelf slot and shows its line as HUD text (placeholder for the card).
+- Objects named "(placeholder)" are primitives standing in for imported art. Replace them, do not polish them.
+
+## Art
+
+- Use real art assets, not primitives and flat colours. Prefer CC0 packs (Kenney, Poly Haven) so nothing needs licensing review; list every pack in the Devpost credits anyway.
+- Planned packs (import into `Assets/ThirdParty/<Pack>/`): Kenney Nature Kit (terrain, rocks, cliffs, trees), Kenney Survival Kit (shovel, workbench, barrels, crates, tools), Kenney Furniture Kit (shelf), Kenney Fantasy Town Kit (the old house, fences), Poly Haven "Evening Field" HDRI (sky). Font: Lora (Google Fonts, OFL) in `Assets/Fonts/`.
+- Look: golden hour, light fog, a vast excavation landscape around a small family backyard. Deeper in the shaft: dimmer, warmer, lit by the lantern.
 
 ## Digging feel (roadmap step 1)
 
@@ -61,11 +79,11 @@ The first prototype used 1 m cube blocks that vanish whole. It felt like Minecra
 Direction:
 
 - Replace the cube grid with a single deformable heightmap mesh for the shaft floor: 5 m x 5 m, about 0.25 m grid spacing. Each shovel stroke lowers the vertices around the aim point with a smooth falloff, leaving a rounded scoop. The shaft is vertical, so no overhangs are needed. Update the MeshCollider after each stroke.
-- Use vertex colors by depth to show dirt, clay and stone.
+- Show dirt, clay and stone by depth (done with a gradient texture, see Notes).
 - Implement "too hard for this shovel" by clamping how low vertices can go for the current shovel level.
 - Feel, in priority order: dirt particles and flying clumps -> a visible shovel with a swing animation -> camera kick -> object discovery moment.
 - Player movement should have acceleration and deceleration and handle the dug slopes smoothly.
-- Status: first pass implemented, needs Play mode tuning.
+- Status: done. The deformation is approved as is.
 - The cube version is committed (`7579305`), so we can revert if the new approach is not working within 2-3 hours.
 
 ## Demo mode (required later)

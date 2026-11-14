@@ -1,9 +1,13 @@
 using UnityEngine;
 
 // Flying dirt: a pool of small tumbling clods, simulated by hand so they need no
-// colliders and no particle material. Created by DigGame.
+// colliders. The pool is runtime state; the mesh and materials are assets set in the scene.
 public class DigDebris : MonoBehaviour
 {
+    public DigTerrain terrain;
+    public Mesh clodMesh;
+    public Material[] materials;   // one per stratum
+
     const int PoolSize = 140;
     const float Gravity = 14f;
 
@@ -16,14 +20,8 @@ public class DigDebris : MonoBehaviour
     bool[] landed;
     int next;
 
-    DigTerrain terrain;
-    Material[] materials;   // one per stratum
-
-    public void Build(DigTerrain terrain, Material[] materials, Mesh cubeMesh)
+    void Awake()
     {
-        this.terrain = terrain;
-        this.materials = materials;
-
         clods = new Transform[PoolSize];
         renderers = new Renderer[PoolSize];
         velocity = new Vector3[PoolSize];
@@ -36,7 +34,7 @@ public class DigDebris : MonoBehaviour
         {
             var go = new GameObject("Clod");
             go.transform.SetParent(transform, false);
-            go.AddComponent<MeshFilter>().sharedMesh = cubeMesh;
+            go.AddComponent<MeshFilter>().sharedMesh = clodMesh;
             renderers[i] = go.AddComponent<MeshRenderer>();
             renderers[i].sharedMaterial = materials[0];
             go.SetActive(false);

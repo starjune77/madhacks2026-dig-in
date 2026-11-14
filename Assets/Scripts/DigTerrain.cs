@@ -1,7 +1,9 @@
 using UnityEngine;
 
-// The diggable shaft floor: one deformable heightmap mesh, 5 m x 5 m.
-// Each shovel stroke lowers the vertices around the aim point. Created by DigGame.
+// The diggable shaft floor: one deformable heightmap mesh, 5 m x 5 m, generated at
+// runtime because it changes with every stroke. The GameObject, renderer, material and
+// collider live in the scene (made by DigIn/Build Scene). Must sit at the world origin.
+[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
 public class DigTerrain : MonoBehaviour
 {
     public const float Size = 5f;
@@ -87,7 +89,7 @@ public class DigTerrain : MonoBehaviour
     }
 
     // ---- Build -----------------------------------------------------------------
-    public void Build(Material strataMaterial)
+    void Awake()
     {
         var rng = new System.Random(12345);
         for (int z = 0; z < N; z++)
@@ -132,17 +134,14 @@ public class DigTerrain : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
-        gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
-        gameObject.AddComponent<MeshRenderer>().sharedMaterial = strataMaterial;
-        meshCollider = gameObject.AddComponent<MeshCollider>();
+        GetComponent<MeshFilter>().sharedMesh = mesh;
+        meshCollider = GetComponent<MeshCollider>();
         meshCollider.sharedMesh = mesh;
-
-        BuildWalls(strataMaterial);
     }
 
-    // Four inward-facing quads that show the strata on the shaft walls.
-    // Collision comes from the earth boxes behind them.
-    void BuildWalls(Material strataMaterial)
+    // Four inward-facing quads that show the strata on the shaft walls. Called by the
+    // editor setup script, which saves the result as a mesh asset.
+    public static Mesh BuildWallMesh()
     {
         float s = Size;
         float bottom = DigGame.TotalDepth + 1f;
@@ -178,13 +177,7 @@ public class DigTerrain : MonoBehaviour
         wallMesh.triangles = wt;
         wallMesh.RecalculateNormals();
         wallMesh.RecalculateBounds();
-
-        var go = new GameObject("Shaft Walls");
-        go.transform.SetParent(transform, false);
-        go.AddComponent<MeshFilter>().sharedMesh = wallMesh;
-        var r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = strataMaterial;
-        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return wallMesh;
     }
 
     // ---- Digging ---------------------------------------------------------------
