@@ -139,7 +139,8 @@ public class DigGame : MonoBehaviour
             pos.y = terrain.HeightAt(pos.x, pos.z);
 
             int s = memories[i].stratum;
-            var prefab = findPrefabsByStratum != null && s < findPrefabsByStratum.Length && findPrefabsByStratum[s] != null
+            var prefab = memories[i].findPrefab != null ? memories[i].findPrefab
+                : findPrefabsByStratum != null && s < findPrefabsByStratum.Length && findPrefabsByStratum[s] != null
                 ? findPrefabsByStratum[s] : findPrefab;
             liveFinds[i] = Instantiate(prefab, pos, Quaternion.identity);
             liveFinds[i].Init(memories[i], terrain);

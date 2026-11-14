@@ -13,4 +13,6 @@ public class MemoryData : ScriptableObject
     public int stratum;
     [Tooltip("Illustrated card. Empty until the card art exists.")]
     public Sprite card;
+    [Tooltip("This memory's own object in the dirt. Empty = the stratum's stand-in.")]
+    public MemoryFind findPrefab;
 }

@@ -102,6 +102,7 @@ public static partial class DigInSceneBuilder
         ApplyFont(hudPrefab, font);
 
         BuildLighting(m);
+        BuildMeshyFinds(memories);
         Migrate(scene, rebuilt);
 
         BuildDigSite(scene, m, wallMesh);
