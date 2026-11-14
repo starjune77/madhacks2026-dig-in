@@ -67,6 +67,17 @@ public class DigPlayer : MonoBehaviour
             return;
         }
 
+        // A card, letter or the ending is open: hold still, and do not let the click that
+        // closes it start a swing.
+        if (DigGame.I.InputLocked)
+        {
+            waitForRelease = true;
+            swinging = false;
+            velocity = Vector3.zero;
+            UpdateCamera();
+            return;
+        }
+
         Look(mouse);
         Move(kb);
         Dig(mouse);

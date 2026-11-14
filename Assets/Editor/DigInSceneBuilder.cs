@@ -41,6 +41,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
+    const string HudVersion = "v2 memory card";
 
     static readonly Color[] StrataColors =
     {
@@ -70,6 +71,7 @@ public static partial class DigInSceneBuilder
         var m = BuildMaterials();
         var memories = BuildMemories();
         var font = BuildFont("Lora-Regular");
+        var italic = BuildFont("Lora-Italic");
         var wallMesh = LoadOrCreate(MeshDir + "/ShaftWalls.asset", DigTerrain.BuildWallMesh);
 
         var rebuilt = new HashSet<string>();
@@ -77,7 +79,7 @@ public static partial class DigInSceneBuilder
         var findPrefab = BuildFindPrefab(rebuilt);
         var shelfPrefab = BuildShelfPrefab(m, font, rebuilt);
         var benchPrefab = BuildWorkbenchPrefab(rebuilt);
-        var hudPrefab = BuildHudPrefab(font);
+        var hudPrefab = BuildHudPrefab(font, italic, rebuilt);
         ApplyFont(hudPrefab, font);
 
         BuildLighting(m);
@@ -126,6 +128,7 @@ public static partial class DigInSceneBuilder
     {
         DestroyRoot(scene, "Ground (placeholder)");
         if (rebuilt.Contains("Player")) DestroyRoot(scene, "Player");
+        if (rebuilt.Contains("HUD")) DestroyRoot(scene, "HUD");
         if (rebuilt.Contains("Shelf") || rebuilt.Contains("Bench")) DestroyRoot(scene, "Surface Hub");
 
         var hub = FindRoot(scene, "Surface Hub");
@@ -531,13 +534,14 @@ public static partial class DigInSceneBuilder
         return SavePrefab(root, path);
     }
 
-    static GameObject BuildHudPrefab(TMP_FontAsset font)
+    static GameObject BuildHudPrefab(TMP_FontAsset font, TMP_FontAsset italic, HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/HUD.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        if (existing != null) { Skipped(path); return existing; }
+        var current = CurrentPrefab(path, HudVersion, "HUD", rebuilt);
+        if (current != null) return current;
 
         var root = new GameObject("HUD", typeof(RectTransform));
+        AddMarker(root, HudVersion);
         var canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 10;
@@ -587,7 +591,68 @@ public static partial class DigInSceneBuilder
             Vector2.zero, new Vector2(1600f, 50f), stretch: true);
         c.characterSpacing = 2f;
 
+        BuildCardUi(root.transform, hud, font, italic);
         return SavePrefab(root, path);
+    }
+
+    static readonly Color PaperColor = new Color(0.96f, 0.92f, 0.83f, 1f);
+
+    // Full-screen overlay node with a CanvasGroup (hidden at start) and a dim backdrop.
+    static CanvasGroup Overlay(string name, Transform parent, Color backdrop)
+    {
+        var node = UiNode(name, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var bg = node.gameObject.AddComponent<Image>();
+        bg.color = backdrop;
+        bg.raycastTarget = false;
+        var group = node.gameObject.AddComponent<CanvasGroup>();
+        group.alpha = 0f;
+        group.blocksRaycasts = false;
+        group.interactable = false;
+        return group;
+    }
+
+    static Image Paper(string name, Transform parent, Vector2 anchor, Vector2 pos, Vector2 size)
+    {
+        var node = UiNode(name, parent, anchor, anchor, pos, size);
+        var img = node.gameObject.AddComponent<Image>();
+        img.color = PaperColor;
+        img.raycastTarget = false;
+        var shadow = node.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+        shadow.effectDistance = new Vector2(8f, -8f);
+        return img;
+    }
+
+    static TMP_Text Ink(string name, Transform parent, TMP_FontAsset font, float size, TextAlignmentOptions align,
+                        string text, Vector2 anchor, Vector2 pos, Vector2 box, float alpha = 1f)
+    {
+        var node = UiNode(name, parent, anchor, anchor, pos, box);
+        var t = Text("Text", node, font, font.material, size, align, text, Vector2.zero, box, stretch: true);
+        t.color = new Color(InkColor.r, InkColor.g, InkColor.b, alpha);
+        return t;
+    }
+
+    // Memory card: name, illustration area, the one-line memory.
+    static void BuildCardUi(Transform root, DigHud hud, TMP_FontAsset font, TMP_FontAsset italic)
+    {
+        hud.cardGroup = Overlay("Memory Card", root, new Color(0.05f, 0.03f, 0.02f, 0.55f));
+        var panel = Paper("Card", hud.cardGroup.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(580f, 740f));
+        hud.cardPanel = (RectTransform)panel.transform;
+
+        var top = new Vector2(0.5f, 1f);
+        hud.cardTitle = Ink("Title", panel.transform, font, 42f, TextAlignmentOptions.Center, "Bicycle Bell", top, new Vector2(0f, -40f), new Vector2(500f, 64f));
+
+        var art = UiNode("Illustration", panel.transform, top, top, new Vector2(0f, -122f), new Vector2(480f, 330f));
+        hud.cardIllustration = art.gameObject.AddComponent<Image>();
+        hud.cardIllustration.raycastTarget = false;
+        var outline = art.gameObject.AddComponent<Outline>();
+        outline.effectColor = new Color(InkColor.r, InkColor.g, InkColor.b, 0.35f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        hud.cardLine = Ink("Line", panel.transform, italic, 30f, TextAlignmentOptions.Center,
+            "“Someone was holding the back of the seat.”", top, new Vector2(0f, -472f), new Vector2(490f, 190f));
+        Ink("Hint", panel.transform, font, 20f, TextAlignmentOptions.Center, "Click to close",
+            new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(490f, 34f), 0.45f);
     }
 
     // If a custom font has been imported since the HUD was made, switch the HUD to it.
@@ -756,6 +821,8 @@ public static partial class DigInSceneBuilder
         if (game == null) game = gameRoot.gameObject.AddComponent<DigGame>();
         var atmosphere = gameRoot.GetComponent<DigAtmosphere>();
         if (atmosphere == null) atmosphere = gameRoot.gameObject.AddComponent<DigAtmosphere>();
+        var story = gameRoot.GetComponent<DigStory>();
+        if (story == null) story = gameRoot.gameObject.AddComponent<DigStory>();
 
         var player = Find<DigPlayer>(scene);
         if (game.terrain == null) game.terrain = Find<DigTerrain>(scene);
@@ -769,7 +836,12 @@ public static partial class DigInSceneBuilder
         if (game.spawnPoint == null && hub != null) game.spawnPoint = hub.Find("Spawn Point");
         if (game.memories == null || game.memories.Length == 0) game.memories = memories;
         if (game.findPrefab == null) game.findPrefab = findPrefab.GetComponent<MemoryFind>();
+        if (game.story == null) game.story = story;
         EditorUtility.SetDirty(game);
+
+        if (story.game == null) story.game = game;
+        if (story.hud == null) story.hud = game.hud;
+        EditorUtility.SetDirty(story);
 
         if (atmosphere.viewer == null && player != null) atmosphere.viewer = player.cam;
         if (atmosphere.sun == null) atmosphere.sun = RenderSettings.sun;

@@ -7,6 +7,9 @@ public class DigGame : MonoBehaviour
 {
     public static DigGame I { get; private set; }
 
+    // True while a card, letter or the ending is on screen.
+    public bool InputLocked => story != null && story.Locked;
+
     public const int StratumCount = 3;
     public const float StratumDepth = 8f;                       // metres per stratum
     public const float TotalDepth = StratumCount * StratumDepth;
@@ -17,6 +20,7 @@ public class DigGame : MonoBehaviour
     public DigPlayer player;
     public DigShovel shovel;
     public DigHud hud;
+    public DigStory story;
     public Workbench workbench;
     public MemoryShelf shelf;
     public Transform spawnPoint;
@@ -40,6 +44,7 @@ public class DigGame : MonoBehaviour
     public int shovelLevel;
 
     bool[] spawned;
+    bool[] found;
     MemoryFind[] liveFinds;
     float scrapProgress;
 
@@ -47,6 +52,7 @@ public class DigGame : MonoBehaviour
     {
         I = this;
         spawned = new bool[memories.Length];
+        found = new bool[memories.Length];
         liveFinds = new MemoryFind[memories.Length];
     }
 
@@ -136,11 +142,13 @@ public class DigGame : MonoBehaviour
         if (find == null) return false;
 
         int index = System.Array.IndexOf(memories, find.Data);
-        if (index >= 0) liveFinds[index] = null;
         Destroy(find.gameObject);
+        if (index < 0) return true;
 
+        liveFinds[index] = null;
+        found[index] = true;
         shelf.Fill(index);
-        hud.ShowMemory(find.Data.title, find.Data.line);
+        story.ShowCard(find.Data);
         return true;
     }
 

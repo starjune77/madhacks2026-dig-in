@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 // Drives the HUD canvas (the HUD prefab). Layout and style live in the prefab;
 // this only updates text and fades things in and out.
@@ -23,12 +24,27 @@ public class DigHud : MonoBehaviour
     public CanvasGroup controlsGroup;
     public float controlsSeconds = 9f;
 
+    [Header("Memory card")]
+    public CanvasGroup cardGroup;
+    public RectTransform cardPanel;
+    public TMP_Text cardTitle;
+    public TMP_Text cardLine;
+    public Image cardIllustration;
+    [Tooltip("Illustration background per stratum while a memory has no card art.")]
+    public Color[] stratumTints =
+    {
+        new Color(0.93f, 0.80f, 0.62f),
+        new Color(0.88f, 0.72f, 0.62f),
+        new Color(0.78f, 0.78f, 0.80f),
+    };
+
     public float fadeSpeed = 3f;
 
     Color scrapBaseColor;
     float scrapFlash;
     float messageTimer;
     bool promptVisible;
+    bool cardVisible;
     float time;
 
     void Awake()
@@ -37,6 +53,7 @@ public class DigHud : MonoBehaviour
         if (promptGroup != null) promptGroup.alpha = 0f;
         if (messageGroup != null) messageGroup.alpha = 0f;
         if (controlsGroup != null) controlsGroup.alpha = 1f;
+        if (cardGroup != null) cardGroup.alpha = 0f;
     }
 
     // upgradeCost < 0 means there is nothing left to upgrade to.
@@ -66,10 +83,25 @@ public class DigHud : MonoBehaviour
         messageTimer = seconds;
     }
 
-    public void ShowMemory(string title, string line)
+    public void ShowCard(MemoryData data)
     {
-        // Placeholder until the illustrated card exists.
-        ShowMessage("<size=70%><smallcaps>" + title + "</smallcaps></size>\n<i>“" + line + "”</i>", 8f);
+        cardVisible = true;
+        if (cardTitle != null) cardTitle.text = data.title;
+        if (cardLine != null) cardLine.text = "“" + data.line + "”";
+        if (cardIllustration != null)
+        {
+            cardIllustration.sprite = data.card;
+            cardIllustration.preserveAspect = true;
+            cardIllustration.color = data.card != null ? Color.white
+                : stratumTints[Mathf.Clamp(data.stratum, 0, stratumTints.Length - 1)];
+        }
+        if (cardPanel != null) cardPanel.localScale = Vector3.one * 0.94f;
+        messageTimer = 0f;   // the card replaces any message
+    }
+
+    public void HideCard()
+    {
+        cardVisible = false;
     }
 
     void Update()
@@ -81,6 +113,9 @@ public class DigHud : MonoBehaviour
         Fade(messageGroup, messageTimer > 0f);
         Fade(promptGroup, promptVisible);
         Fade(controlsGroup, time < controlsSeconds, 0.5f);
+        Fade(cardGroup, cardVisible, 1.5f);
+        if (cardPanel != null && cardVisible)
+            cardPanel.localScale = Vector3.one * Mathf.MoveTowards(cardPanel.localScale.x, 1f, dt * 0.5f);
 
         if (scrapText != null && scrapFlash > 0f)
         {
