@@ -32,16 +32,32 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
 ## Conventions
 
 - **Assets over code. Code draws only what must be procedural.** Code generates only the deformable heightmap terrain (and its strata texture lookup), the dirt debris, and runtime state. Everything else (environment, props, shovel, player, hub, UI, lighting) is real Unity content: GameObjects saved in SampleScene, prefabs, materials and textures in `Assets/`, UI as a UGUI Canvas, all editable in the editor. Runtime code references them through serialized fields and never creates them.
-- Because Claude cannot click in the editor, persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder*.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. Prefabs carry a version marker child (e.g. "v2 bookcase"); bumping the version constant rebuilds that prefab and recreates its scene instances. New content goes into that script, not into runtime code.
+- Persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder*.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. Prefabs carry a version marker child (e.g. "v2 bookcase"); bumping the version constant rebuilds that prefab and recreates its scene instances. New content goes into that script, not into runtime code.
 - Kenney models are placed by their measured bounds (`Place`, `FitInside`, `Edge` helpers), never by assumed sizes: the kits use different units (cm, 10 cm, m) and pivots.
-- **No sound.** Do not add any audio (procedural or files) until the developer explicitly asks for it.
+- **No sound** until the developer asks for it. Do not add any audio, procedural or files.
+- First-person actions (shovel swing, dirt impact, object popping out, card reveal) use Unity animation assets where that makes sense.
 - Use only the new Input System (`Keyboard.current`, `Mouse.current`). The legacy `Input` class throws errors in this project.
 - Never call `Shader.Find` at runtime (shaders can be stripped from builds). In editor scripts it is fine, because the saved material asset keeps a hard reference to its shader.
 - Text uses TextMesh Pro. The setup script imports the TMP Essential Resources if they are missing.
 - Keep manual editor setup to a minimum. If a manual step is required, give exact steps.
-- Claude cannot run Unity. After each change, say exactly what to run in the editor and what to check in Play mode.
 - Do not touch `Library/`, `Temp/` or `Logs/`.
 - All in-game text is in English.
+
+## Checking work in the editor
+
+Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline package `com.unity.pipeline`).
+
+- **After every visual change, enter Play mode, take screenshots, look at them, and fix problems before reporting to the developer. Read the Console after every change.**
+- Build Scene: `unity command script eval -- --code 'DigInSceneBuilder.BuildScene(); return 1;'`. Screenshots: `unity command capture game_view -- --source screen --output-path <absolute path outside the repo>`.
+- Run `unity` from Git Bash, not PowerShell 5.1 (it strips the quotes inside C# snippets).
+- Simulated keys and clicks do not reach the game while the Editor window is in the background. Drive the game through its public methods instead (`DigGame.I.DemoJump(n)`, `DemoEnding()`, `Strike`, `TryPickUp`, `player.Teleport` / `SetLook`), and ask the developer to check anything that needs real input.
+
+## Meshy (generated 3D assets)
+
+- Use Meshy only for hero assets: the nine memory objects, the three shovels, the family house, and a few key props. Keep Kenney for the bulk of the environment.
+- Style: stylized low poly, soft warm colours, clean silhouettes, matching the Kenney look. Not photorealistic. Use low-poly mode (smart topology, `meshy-t2.5`) with game-ready face counts.
+- Generate one asset first and show the developer a screenshot of it in the scene before generating the rest. Report credits used after each batch.
+- Save Meshy assets under `Assets/ThirdParty/Meshy/<AssetName>/`. They are generated on a paid plan with full commercial rights.
 
 ## Project layout
 
