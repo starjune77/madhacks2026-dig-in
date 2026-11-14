@@ -19,13 +19,43 @@ public class MemoryShelf : MonoBehaviour
 
     public Slot[] slots = new Slot[9];
 
+    [Tooltip("Illustration colour per stratum while a memory has no card art.")]
+    public Color[] stratumTints =
+    {
+        new Color(0.93f, 0.80f, 0.62f),
+        new Color(0.88f, 0.72f, 0.62f),
+        new Color(0.78f, 0.78f, 0.80f),
+    };
+
+    MaterialPropertyBlock block;
+
     void Awake()
     {
         for (int i = 0; i < slots.Length; i++) Show(i, false);
     }
 
-    public void Fill(int index)
+    // Puts the framed card for this memory on its slot.
+    public void Fill(int index, MemoryData data)
     {
+        if (index < 0 || index >= slots.Length || slots[index] == null) return;
+        var slot = slots[index];
+        if (slot.title != null) slot.title.text = data.title;
+
+        if (slot.illustration != null)
+        {
+            if (block == null) block = new MaterialPropertyBlock();
+            slot.illustration.GetPropertyBlock(block);
+            if (data.card != null)
+            {
+                block.SetTexture("_BaseMap", data.card.texture);
+                block.SetColor("_BaseColor", Color.white);
+            }
+            else
+            {
+                block.SetColor("_BaseColor", stratumTints[Mathf.Clamp(data.stratum, 0, stratumTints.Length - 1)]);
+            }
+            slot.illustration.SetPropertyBlock(block);
+        }
         Show(index, true);
     }
 

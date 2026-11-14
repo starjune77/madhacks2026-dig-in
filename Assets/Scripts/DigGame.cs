@@ -160,7 +160,7 @@ public class DigGame : MonoBehaviour
 
         liveFinds[index] = null;
         found[index] = true;
-        shelf.Fill(index);
+        shelf.Fill(index, find.Data);
         story.ShowCard(find.Data);
         return true;
     }
