@@ -54,8 +54,11 @@ You dig down with a toy shovel and unearth objects from ordinary moments you onc
   - `DigHud.cs` (HUD prefab): updates the Canvas UI. Controls hint fades out after a few seconds.
   - `DigAtmosphere.cs` (on "Game"): dimmer, warmer ambient light and fog with depth; drives the lantern light on the player.
   - `MemoryData.cs`: ScriptableObject per memory (title, line, depth, stratum, card sprite). Assets in `Assets/Data/Memories/`.
-  - `MemoryFind.cs` (Memory Find prefab): a found object lying in the dirt.
-  - `MemoryShelf.cs` (Memory Shelf prefab): nine slots, rows top to bottom = Childhood, School Days, Growing Up.
+  - `MemoryFind.cs` (Memory Find prefabs, one per stratum, and the Blank Page prefab): a found object lying in the dirt.
+  - `MemoryShelf.cs` (Memory Shelf prefab): nine framed card slots, rows top to bottom = Childhood, School Days, Growing Up.
+  - `DigStory.cs` (on "Game"): memory card, letter after a stratum's third memory, the ending sequence. Locks player input while open.
+  - `LetterData.cs`: ScriptableObject per letter (title, lines). Assets in `Assets/Data/Letters/`; the ending is letter 4. The blank page is `Assets/Data/Blank Page.asset`.
+  - `DigDemo.cs` (on "Game"): demo mode.
   - `Workbench.cs` (Workbench prefab): upgrade spot. Walk up and press E.
 - `Assets/Editor/DigInSceneBuilder.cs`: the setup script (assets, prefabs, lighting, shaft, hub, wiring).
 - `Assets/Editor/DigInSceneBuilder.Environment.cs`: the world: terrain (heightmap from `GroundHeight`, strata-banded terrace faces, pines), house, yard, shaft rim, excavation props, rock formations.
@@ -90,9 +93,9 @@ Direction:
 - Status: done. The deformation is approved as is.
 - The cube version is committed (`7579305`), so we can revert if the new approach is not working within 2-3 hours.
 
-## Demo mode (required later)
+## Demo mode
 
-F1-F4 jump to the start of each stratum and to the ending, enabled only in a separate DemoMode. Target demo flow: 30 seconds of digging -> first object -> jump to the ending.
+F12 toggles demo mode (badge at top right). Then F1 = surface with the Toy Shovel, F2 = 8 m down with the Garden Shovel, F3 = 16 m down with the Steel Shovel, F4 = the bottom with the blank page in front of you. A jump lowers the whole shaft floor to that depth (`DigTerrain.LowerTo`) and skips memories above it. Target demo flow: 30 seconds of digging -> first object -> F4 -> ending.
 
 ## Memory objects
 
@@ -122,6 +125,8 @@ Growing Up
 - Ending - The Blank Page: "There was nothing written on the last page. Not because nothing happened today. But because today isn't over yet. Someday, this ordinary day might be something worth digging up."
 
 ## Roadmap
+
+Status (2026-11-14): steps 1-4 and demo mode are implemented; not yet play-tested together.
 
 1. Digging feel (above)
 2. Three memory objects + card display
