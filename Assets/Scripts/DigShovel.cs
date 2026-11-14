@@ -12,25 +12,26 @@ public class DigShovel : MonoBehaviour
     [Range(0f, 1f)] public float impactT = 0.42f;
 
     // Key poses: rest -> raised -> strike -> dig in -> scoop -> rest.
-    // Rotation x = pitch (positive points the blade down).
+    // Rotation x = pitch (positive points the blade down). At rest the shovel sits low
+    // on the right with the blade tipped up, so its face shows and the centre stays clear.
     public float[] keyTime = { 0f, 0.30f, 0.42f, 0.50f, 0.75f, 1f };
     public Vector3[] keyPos =
     {
-        new Vector3(0.30f, -0.30f, 0.40f),
-        new Vector3(0.28f, -0.26f, 0.36f),
-        new Vector3(0.20f, -0.28f, 0.55f),
-        new Vector3(0.19f, -0.30f, 0.59f),
-        new Vector3(0.26f, -0.30f, 0.48f),
-        new Vector3(0.30f, -0.30f, 0.40f),
+        new Vector3(0.40f, -0.46f, 0.40f),
+        new Vector3(0.36f, -0.38f, 0.36f),
+        new Vector3(0.22f, -0.30f, 0.55f),
+        new Vector3(0.21f, -0.32f, 0.59f),
+        new Vector3(0.30f, -0.36f, 0.48f),
+        new Vector3(0.40f, -0.46f, 0.40f),
     };
     public Vector3[] keyRot =
     {
-        new Vector3(-5f, -12f, 0f),
-        new Vector3(-35f, -8f, 0f),
+        new Vector3(-30f, -20f, 8f),
+        new Vector3(-58f, -14f, 4f),
         new Vector3(22f, -10f, 0f),
         new Vector3(26f, -10f, 0f),
-        new Vector3(-12f, -6f, 12f),
-        new Vector3(-5f, -12f, 0f),
+        new Vector3(-18f, -12f, 12f),
+        new Vector3(-30f, -20f, 8f),
     };
 
     void Start()

@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 762a4520b8614b6f85a4e565167aa24b, type: 3}
+  m_Name: 4 Ending - The Blank Page
+  m_EditorClassIdentifier: Assembly-CSharp::LetterData
+  title: 
+  lines:
+  - There was nothing written on the last page.
+  - Not because nothing happened today.
+  - But because today isn't over yet.
+  - Someday, this ordinary day might be something worth digging up.

@@ -10,6 +10,10 @@ public class DigPlayer : MonoBehaviour
 
     public const float EyeHeight = 0.7f;   // camera height above the controller centre
 
+    // Frame of the click that re-grabbed the cursor after Esc. That click only grabs:
+    // it must not dig, pick up, or close a card or letter (DigStory checks this).
+    public static int CursorGrabFrame { get; private set; } = -1;
+
     const float MoveSpeed = 4.2f;
     const float GroundAccel = 32f;
     const float GroundDecel = 40f;
@@ -62,6 +66,7 @@ public class DigPlayer : MonoBehaviour
             if (mouse.leftButton.wasPressedThisFrame)
             {
                 LockCursor(true);
+                CursorGrabFrame = Time.frameCount;
                 waitForRelease = true;   // the click that grabs the cursor should not dig
             }
             return;

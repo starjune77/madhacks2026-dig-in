@@ -38,11 +38,12 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v2 kenney shovels";
+    const string PlayerVersion = "v3 rest pose";
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
-    const string HudVersion = "v5 demo badge";
+    const string HudVersion = "v6 ending layout";
+    const string HubVersion = "v2 lean-to";      // marker child of scene/Surface Hub
     const string PageVersion = "v1 page";
 
     static readonly Color[] StrataColors =
@@ -151,7 +152,7 @@ public static partial class DigInSceneBuilder
         if (rebuilt.Contains("Shelf") || rebuilt.Contains("Bench")) DestroyRoot(scene, "Surface Hub");
 
         var hub = FindRoot(scene, "Surface Hub");
-        if (hub != null && hub.Find("Lean-to") == null) DestroyRoot(scene, "Surface Hub");
+        if (hub != null && hub.Find(HubVersion) == null) DestroyRoot(scene, "Surface Hub");
 
         // v1 had 40 m earth boxes around the shaft; they would cover the excavation.
         var earth = FindRoot(scene, "Dig Site")?.Find("Shaft Earth");
@@ -402,7 +403,8 @@ public static partial class DigInSceneBuilder
 
         var lanternGo = new GameObject("Lantern");
         lanternGo.transform.SetParent(camGo.transform, false);
-        lanternGo.transform.localPosition = new Vector3(0.35f, -0.2f, 0.25f);
+        // On the left, away from the shovel, so the handle is not blown out by its own light.
+        lanternGo.transform.localPosition = new Vector3(-0.35f, 0f, 0.1f);
         var lantern = lanternGo.AddComponent<Light>();
         lantern.type = LightType.Point;
         lantern.color = new Color(1f, 0.72f, 0.42f);
@@ -421,8 +423,8 @@ public static partial class DigInSceneBuilder
         shovel.models = new[]
         {
             ShovelModel("Toy Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.46f, toyMat),
-            ShovelModel("Garden Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.64f, null),
-            ShovelModel("Steel Shovel", shovelGo.transform, "SurvivalKit/tool-shovel-upgraded", 0.74f, steelMat),
+            ShovelModel("Garden Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.54f, null),
+            ShovelModel("Steel Shovel", shovelGo.transform, "SurvivalKit/tool-shovel-upgraded", 0.62f, steelMat),
         };
         shovel.models[1].SetActive(false);
         shovel.models[2].SetActive(false);
@@ -680,9 +682,9 @@ public static partial class DigInSceneBuilder
         var controls = UiNode("Controls", root.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -56f), new Vector2(1600f, 50f));
         hud.controlsGroup = controls.gameObject.AddComponent<CanvasGroup>();
         var c = Text("Text", controls, font, shadow, 22f, TextAlignmentOptions.Center,
-            "<b>WASD</b> <alpha=#AA>walk</alpha>      <b>Mouse</b> <alpha=#AA>look</alpha>      " +
-            "<b>Hold Left Click</b> <alpha=#AA>dig</alpha>      <b>E</b> <alpha=#AA>use</alpha>      " +
-            "<b>R</b> <alpha=#AA>back to the surface</alpha>",
+            "<b>WASD</b> <alpha=#AA>walk<alpha=#FF>      <b>Mouse</b> <alpha=#AA>look<alpha=#FF>      " +
+            "<b>Hold Left Click</b> <alpha=#AA>dig<alpha=#FF>      <b>E</b> <alpha=#AA>use<alpha=#FF>      " +
+            "<b>R</b> <alpha=#AA>back to the surface<alpha=#FF>",
             Vector2.zero, new Vector2(1600f, 50f), stretch: true);
         c.characterSpacing = 2f;
 
@@ -695,8 +697,8 @@ public static partial class DigInSceneBuilder
         hud.demoGroup = demo.gameObject.AddComponent<CanvasGroup>();
         hud.demoGroup.alpha = 0f;
         Text("Text", demo, font, shadow, 20f, TextAlignmentOptions.TopRight,
-            "<b>DEMO</b>    F1 <alpha=#AA>Childhood</alpha>   F2 <alpha=#AA>School Days</alpha>   " +
-            "F3 <alpha=#AA>Growing Up</alpha>   F4 <alpha=#AA>Ending</alpha>",
+            "<b>DEMO</b>    F1 <alpha=#AA>Childhood<alpha=#FF>   F2 <alpha=#AA>School Days<alpha=#FF>   " +
+            "F3 <alpha=#AA>Growing Up<alpha=#FF>   F4 <alpha=#AA>Ending<alpha=#FF>",
             Vector2.zero, new Vector2(900f, 40f), stretch: true);
 
         // Full-screen black on top of everything, for the ending's fade.
@@ -790,7 +792,7 @@ public static partial class DigInSceneBuilder
         p.group = Overlay("Ending", root, new Color(0.02f, 0.015f, 0.01f, 0.9f));
         Paper("Blank Page", p.group.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 190f), new Vector2(300f, 400f));
 
-        var body = UiNode("Lines", p.group.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -150f), new Vector2(1200f, 340f));
+        var body = UiNode("Lines", p.group.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -240f), new Vector2(1200f, 340f));   // top edge clear of the page
         var layout = body.gameObject.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 18f;
         layout.childAlignment = TextAnchor.UpperCenter;
@@ -968,6 +970,7 @@ public static partial class DigInSceneBuilder
     {
         var hub = Root(scene, "Surface Hub", out bool created);
         if (!created) return;
+        new GameObject(HubVersion).transform.SetParent(hub, false);
 
         var spawn = new GameObject("Spawn Point").transform;
         spawn.SetParent(hub, false);
@@ -984,10 +987,11 @@ public static partial class DigInSceneBuilder
         var leanTo = new GameObject("Lean-to").transform;
         leanTo.SetParent(hub, false);
         Instance(benchPrefab, leanTo, BenchPos, -90f);
-        Place(leanTo, "SurvivalKit/structure-roof", BenchPos, -90f, width: 3.4f);
-        Place(leanTo, "SurvivalKit/resource-planks", BenchPos + new Vector3(0.6f, 0f, 1.3f), 10f, width: 1.2f);
-        Place(leanTo, "SurvivalKit/tool-pickaxe", BenchPos + new Vector3(0.9f, 0f, -1.2f), 30f, height: 0.6f);
-        Lantern(leanTo, BenchPos + new Vector3(1.4f, 0f, 1.6f), 2.1f);
+        // 2.6 m wide makes the kit's frame about 3.1 m tall: a shelter, not a gateway.
+        Place(leanTo, "SurvivalKit/structure-roof", BenchPos, -90f, width: 2.6f);
+        Place(leanTo, "SurvivalKit/resource-planks", BenchPos + new Vector3(0.3f, 0f, 1.9f), 10f, width: 1.2f);
+        Place(leanTo, "SurvivalKit/tool-pickaxe", BenchPos + new Vector3(0.8f, 0f, -0.8f), 30f, height: 0.6f);
+        Lantern(leanTo, BenchPos + new Vector3(2.1f, 0f, 2.0f), 2.1f);
     }
 
     static void WireGame(Scene scene, MemoryData[] memories, LetterData[] letters, GameObject[] findPrefabs)

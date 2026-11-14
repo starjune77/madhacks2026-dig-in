@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 762a4520b8614b6f85a4e565167aa24b, type: 3}
+  m_Name: 2 School Days
+  m_EditorClassIdentifier: Assembly-CSharp::LetterData
+  title: School Days
+  lines:
+  - I spent so much time waiting for the next thing.
+  - The next bell, the next weekend, the next exam to be over.
+  - Somewhere between all that waiting, we laughed at things that weren't even funny.
+  - I wonder if the others remember them too.

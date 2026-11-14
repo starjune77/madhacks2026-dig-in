@@ -171,7 +171,10 @@ public class DigStory : MonoBehaviour
     {
         var mouse = Mouse.current;
         var kb = Keyboard.current;
-        return (mouse != null && mouse.leftButton.wasPressedThisFrame) ||
+        // A click while the cursor is free (after Esc) only grabs the cursor again.
+        bool click = mouse != null && mouse.leftButton.wasPressedThisFrame &&
+                     Cursor.lockState == CursorLockMode.Locked && Time.frameCount != DigPlayer.CursorGrabFrame;
+        return click ||
                (kb != null && (kb.eKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame));
     }
 }
