@@ -58,6 +58,9 @@ public class DigHud : MonoBehaviour
     [Tooltip("Full-screen black, for fading out and back in.")]
     public CanvasGroup fadeGroup;
 
+    [Header("Demo mode badge")]
+    public CanvasGroup demoGroup;
+
     public float fadeSpeed = 3f;
 
     Color scrapBaseColor;
@@ -77,6 +80,11 @@ public class DigHud : MonoBehaviour
         if (letter.group != null) letter.group.alpha = 0f;
         if (ending.group != null) ending.group.alpha = 0f;
         if (fadeGroup != null) fadeGroup.alpha = 0f;
+    }
+
+    public void SetDemo(bool on)
+    {
+        if (demoGroup != null) demoGroup.alpha = on ? 1f : 0f;
     }
 
     // 0 = clear, 1 = black.

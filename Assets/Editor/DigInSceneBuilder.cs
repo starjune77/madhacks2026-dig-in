@@ -42,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
-    const string HudVersion = "v4 ending";
+    const string HudVersion = "v5 demo badge";
     const string PageVersion = "v1 page";
 
     static readonly Color[] StrataColors =
@@ -690,6 +690,15 @@ public static partial class DigInSceneBuilder
         BuildLetterUi(root.transform, hud, font, italic);
         BuildEndingUi(root.transform, hud, italic);
 
+        // Demo mode badge, top right, hidden until F12.
+        var demo = UiNode("Demo Badge", root.transform, Vector2.one, Vector2.one, new Vector2(-40f, -32f), new Vector2(900f, 40f));
+        hud.demoGroup = demo.gameObject.AddComponent<CanvasGroup>();
+        hud.demoGroup.alpha = 0f;
+        Text("Text", demo, font, shadow, 20f, TextAlignmentOptions.TopRight,
+            "<b>DEMO</b>    F1 <alpha=#AA>Childhood</alpha>   F2 <alpha=#AA>School Days</alpha>   " +
+            "F3 <alpha=#AA>Growing Up</alpha>   F4 <alpha=#AA>Ending</alpha>",
+            Vector2.zero, new Vector2(900f, 40f), stretch: true);
+
         // Full-screen black on top of everything, for the ending's fade.
         var fade = UiNode("Fade", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         var black = fade.gameObject.AddComponent<Image>();
@@ -1029,6 +1038,14 @@ public static partial class DigInSceneBuilder
     {
         var game = Find<DigGame>(scene);
         var story = Find<DigStory>(scene);
+        if (game != null)
+        {
+            var demo = game.GetComponent<DigDemo>();
+            if (demo == null) demo = game.gameObject.AddComponent<DigDemo>();
+            if (demo.game == null) demo.game = game;
+            if (demo.hud == null) demo.hud = game.hud;
+            EditorUtility.SetDirty(demo);
+        }
         var hub = FindRoot(scene, "Surface Hub");
         if (game != null)
         {

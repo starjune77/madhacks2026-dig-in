@@ -97,7 +97,9 @@ public class DigGame : MonoBehaviour
                 hud.ShowMessage("This ground is too hard for the " + shovelNames[shovelLevel] + ".");
                 return true;
             }
-            // The very bottom ("today"). The ending will hook in here.
+            // The very bottom ("today"): nothing more to dig, but the blank page may still
+            // be waiting to turn up.
+            CheckFinds(hit.point);
             return false;
         }
 
@@ -163,6 +165,57 @@ public class DigGame : MonoBehaviour
         var page = Instantiate(blankPagePrefab, pos, Quaternion.identity);
         page.Init(blankPage, terrain);
         debris.Burst(pos, Vector3.up, Vector3.zero, 2, 10);
+    }
+
+    // ---- Demo mode (DigDemo) --------------------------------------------------
+    static readonly string[] StratumNames = { "Childhood", "School Days", "Growing Up" };
+
+    // Start of a stratum with the shovel for it. Memories above that depth are skipped.
+    public void DemoJump(int stratum)
+    {
+        SetShovel(stratum);
+        float depth = stratum * StratumDepth;
+        SkipMemoriesAbove(depth);
+        if (stratum == 0)
+        {
+            ReturnToSurface();
+        }
+        else
+        {
+            terrain.LowerTo(-depth);
+            player.Teleport(new Vector3(DigTerrain.Size * 0.5f, -depth + 1f, 1.2f));
+            player.SetLook(0f, 30f);
+        }
+        hud.ShowMessage(StratumNames[stratum], 2f);
+    }
+
+    // The bottom of the shaft with the blank page in front of you.
+    public void DemoEnding()
+    {
+        SetShovel(StratumCount - 1);
+        SkipMemoriesAbove(TotalDepth + 1f);
+        float floor = -(blankPageDepth + 0.1f);
+        terrain.LowerTo(floor);
+        player.Teleport(new Vector3(DigTerrain.Size * 0.5f, floor + 1f, 1.2f));
+        player.SetLook(0f, 40f);
+        pageSpawned = false;
+        SpawnBlankPage(new Vector3(DigTerrain.Size * 0.5f, 0f, 2.9f));
+    }
+
+    void SetShovel(int level)
+    {
+        shovelLevel = Mathf.Clamp(level, 0, shovelNames.Length - 1);
+        shovel.SetLevel(shovelLevel);
+    }
+
+    void SkipMemoriesAbove(float depth)
+    {
+        for (int i = 0; i < memories.Length; i++)
+        {
+            if (memories[i] == null || memories[i].depth >= depth) continue;
+            spawned[i] = true;
+            if (liveFinds[i] != null) { Destroy(liveFinds[i].gameObject); liveFinds[i] = null; }
+        }
     }
 
     // Called by DigStory while the screen is black: everything ends up on the shelf and

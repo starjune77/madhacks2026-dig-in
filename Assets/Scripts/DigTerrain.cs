@@ -235,6 +235,14 @@ public class DigTerrain : MonoBehaviour
         return result;
     }
 
+    // Demo mode only: flattens the whole floor down to `height` (never raises it).
+    // Separate from Dig(), which stays the only way the player shapes the ground.
+    public void LowerTo(float height)
+    {
+        for (int i = 0; i < heights.Length; i++) heights[i] = Mathf.Min(heights[i], height);
+        ApplyHeights();
+    }
+
     void ApplyHeights()
     {
         for (int i = 0; i < heights.Length; i++)
