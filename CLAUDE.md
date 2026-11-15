@@ -39,7 +39,7 @@ Underneath, the world is not quite the real one. It is a dream, or something lik
 - The shovel is only a tool for going further. The real reward is the memories.
 - The game starts like an ordinary digging game. The meaning should dawn on the player gradually.
 - **Realistic art direction**: photoreal quality close to modern realistic indie simulator games, warm, calm and nostalgic (golden hour, soft haze, warm grade). Never cold or gritty. No low-poly assets anywhere; do not mix styles. Every Kenney asset leaves the scene.
-- **Sound**: natural, soft and gentle; recorded foley, never synthetic or procedural; a quiet, calm mix.
+- **Sound**: natural, soft and gentle; recorded foley, never synthetic or procedural; a quiet, calm mix. Digging is the clearest sound and should feel like ASMR: close, crisp, layered (bite, lift, trickle, clods). Music is a slow, wistful solo piano, the lowest thing in the mix.
 - Out: scrap, the workbench, the Kenney low-poly look. Also out of scope: third-person view, Databricks integration, complex inventory.
 
 ## Status (2026-11-15 morning)
@@ -53,7 +53,7 @@ Performance budget: 60 fps at 1080p on the developer's laptop. A built player ru
 - **Assets over code. Code draws only what must be procedural.** Code generates only the diggable volume (density field, chunk meshes and colliders), the debris pool, the scoop preview and runtime state. Everything else (environment, props, shovel, player, hub, UI, lighting, animation clips, particle systems) is real Unity content: GameObjects saved in SampleScene, prefabs, materials, textures and clips in `Assets/`, UI as a UGUI Canvas, all editable in the editor. Runtime code references them through serialized fields and never creates them.
 - Persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder*.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. Prefabs and versioned scene objects carry a version marker child (e.g. "v2 bookcase"); bumping the version constant rebuilds that piece. New content goes into that script, not into runtime code.
 - Models are placed by their measured bounds (`Place`, `FitInside`, `Edge` helpers), never by assumed sizes: packs use different units and pivots.
-- **Sound** is recorded foley only (CC0 from Freesound with the CC0 filter, Kenney audio, or royalty-free packs that allow commercial use), never procedural. Slight random pitch and volume on repeated sounds; surface ambience is muffled underground with a low-pass filter; keep the mix quiet. Every source and licence goes in `CREDITS.md`.
+- **Sound** is recorded only, never procedural. Allowed sources: the Sonniss GDC Game Audio Bundle (royalty-free), Pixabay (Pixabay Content License), Freesound with the CC0 filter only. Never BBC Sound Effects or anything CC-BY-NC. Sonniss and Pixabay block automated downloads: ask the developer to fetch files into a `DigInAudio` folder in their Downloads. Freesound's public HQ OGG previews can be fetched directly. Cut sources with `Assets/Editor/DigAudioCutter.cs` (sources go in `Assets/AudioIn`, never committed). 6-10 variations per layer, no immediate repeats, pitch +-4%, volume +-2 dB; route everything through `Assets/Audio/DigIn.mixer` (Music, SFX, Ambience, UI; `MasterVolume` exposed). Every source and licence goes in `CREDITS.md`.
 - First-person actions (shovel swing, dirt impact, object popping out, card reveal) use Unity animation assets where that makes sense.
 - Use only the new Input System (`Keyboard.current`, `Mouse.current`). The legacy `Input` class throws errors in this project.
 - Never call `Shader.Find` at runtime (shaders can be stripped from builds). In editor scripts it is fine, because the saved material asset keeps a hard reference to its shader.
@@ -94,7 +94,7 @@ Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline 
   - `DigShop.cs` (on "Game"): the cat's price board (sell tiles and tier cards with pictures rendered from the models, `DigShopTile.cs` lifts them under the mouse), prices, the cat's lines (including the ones a cat couldn't know).
   - `DigPause.cs` (on "Game"): the Esc pause menu (notebook page over the blurred "Pause Blur" volume; Settings saved in PlayerPrefs) and the first-launch How to Play note.
   - `DigCat.cs`: the cat's breathing and purring (Animator, `Assets/Animations/Cat.controller`), turning to watch you.
-  - `DigAudio.cs` (on "Game"): all sound; clips in `Assets/Audio/`.
+  - `DigAudio.cs` (on "Game"): all sound: layered digging per stratum on the swing's impact event, footsteps, yard loops and bird calls, room tone and tunnel reverb, the cat's purr, music with depth crossfade and ducking; clips in `Assets/Audio/`.
   - `DigPlayer.cs`, `DigShovel.cs`: movement, look, dig input; the animated spade (clips in `Assets/Animations/`).
   - `DigHud.cs`, `DigStory.cs`: HUD, cards, letters, the ending and the waking scene.
   - `DigAtmosphere.cs`: darker, warmer light and fog with depth; the lantern.
