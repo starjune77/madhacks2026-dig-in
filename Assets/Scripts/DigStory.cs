@@ -185,6 +185,9 @@ public class DigStory : MonoBehaviour
 
     void Update()
     {
+        // The pause menu has the input (and time is stopped).
+        if (game.pause != null && game.pause.IsOpen) return;
+
         if (mode == Mode.Letter)
         {
             revealTime += Time.deltaTime;
@@ -201,7 +204,10 @@ public class DigStory : MonoBehaviour
         }
 
         if (mode == Mode.None) return;
-        if (Time.unscaledTime - openedAt < inputGrace || !ContinuePressed()) return;
+        // Esc closes a card or a letter at once (before it could open the pause menu).
+        bool esc = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+        if (Time.unscaledTime - openedAt < inputGrace && !esc) return;
+        if (!esc && !ContinuePressed()) return;
 
         if (mode == Mode.Card)
         {
@@ -215,7 +221,7 @@ public class DigStory : MonoBehaviour
         }
         else if (mode == Mode.Letter)
         {
-            if (!revealDone)
+            if (!revealDone && !esc)
             {
                 revealTime = 1000f;   // first click shows the rest at once
                 return;

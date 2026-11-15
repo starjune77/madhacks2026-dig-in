@@ -89,12 +89,15 @@ public class DigPlayer : MonoBehaviour
         var mouse = Mouse.current;
         if (kb == null || mouse == null) return;
 
-        // The shop frees the cursor while it is open; its own Esc and clicks are not ours.
+        // The shop and the pause menu free the cursor while they are open; their own Esc
+        // and clicks are not ours.
         bool shopOpen = DigGame.I.shop != null && DigGame.I.shop.IsOpen;
         bool shopJustClosed = Time.frameCount - DigShop.LastClosedFrame <= 1;
-        if (shopOpen || shopJustClosed)
+        bool paused = DigGame.I.pause != null && DigGame.I.pause.IsOpen;
+        bool pauseJustClosed = Time.frameCount - DigPause.LastClosedFrame <= 1;
+        if (shopOpen || shopJustClosed || paused || pauseJustClosed)
         {
-            waitForRelease = true;   // the click that closes the shop must not swing
+            waitForRelease = true;   // the click that closes the shop or the menu must not swing
             velocity = Vector3.zero;
             lookRate = Vector2.zero;
             DigGame.I.HideAim();
@@ -102,7 +105,8 @@ public class DigPlayer : MonoBehaviour
             return;
         }
 
-        if (kb.escapeKey.wasPressedThisFrame) LockCursor(false);
+        // Esc opens the pause menu (DigPause). If the cursor got free some other way (the
+        // window lost focus), a click takes it back without digging.
         if (Cursor.lockState != CursorLockMode.Locked)
         {
             if (mouse.leftButton.wasPressedThisFrame)

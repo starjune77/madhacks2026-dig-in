@@ -12,7 +12,7 @@ public class DigGame : MonoBehaviour
     public static int AimMask { get; private set; } = Physics.DefaultRaycastLayers;
 
     // True while a card, letter or the ending is on screen.
-    public bool InputLocked => (story != null && story.Locked) || (shop != null && shop.IsOpen);
+    public bool InputLocked => (story != null && story.Locked) || (shop != null && shop.IsOpen) || (pause != null && pause.IsOpen);
 
     public const int StratumCount = 3;
 
@@ -29,6 +29,7 @@ public class DigGame : MonoBehaviour
     public DigHud hud;
     public DigStory story;
     public DigShop shop;
+    public DigPause pause;
     public DigMinerals minerals;
     public DigAtmosphere atmosphere;
     [Tooltip("The shop counter: walk up to it and press E.")]

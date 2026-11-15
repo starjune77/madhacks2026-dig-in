@@ -340,7 +340,7 @@ public static partial class DigInSceneBuilder
             Created(path);
         }
 
-        var volume = Object.FindObjectsByType<Volume>().FirstOrDefault(v => v.isGlobal);
+        var volume = Object.FindObjectsByType<Volume>().FirstOrDefault(v => v.isGlobal && v.name != "Pause Blur");
         if (volume == null) volume = new GameObject("Global Volume").AddComponent<Volume>();
         volume.isGlobal = true;
         volume.sharedProfile = profile;

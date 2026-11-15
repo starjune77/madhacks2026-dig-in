@@ -42,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v13 shop cards";
+    const string HudVersion = "v15 pause";
     const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
@@ -136,6 +136,7 @@ public static partial class DigInSceneBuilder
         BuildDigSite(scene, m, feel);
         BuildHub(scene, shelfPrefab, benchPrefab);
         BuildBedroom(scene);
+        BuildPauseVolume(scene);
 
         var player = Root(scene, "Player", out bool newPlayer, playerPrefab);
         if (newPlayer) player.position = SpawnPos;
@@ -780,6 +781,8 @@ public static partial class DigInSceneBuilder
         BuildShopUi(root.transform, hud, font, italic);
         BuildLetterUi(root.transform, hud, font, italic);
         BuildEndingUi(root.transform, hud, italic);
+        BuildPauseUi(root.transform, hud, font, italic);
+        BuildHowToUi(root.transform, hud, font, italic);
 
         // Demo mode badge, top right, hidden until F12.
         var demo = UiNode("Demo Badge", root.transform, Vector2.one, Vector2.one, new Vector2(-40f, -32f), new Vector2(1100f, 40f));
@@ -1086,6 +1089,8 @@ public static partial class DigInSceneBuilder
         if (story == null) story = gameRoot.gameObject.AddComponent<DigStory>();
         var shop = gameRoot.GetComponent<DigShop>();
         if (shop == null) shop = gameRoot.gameObject.AddComponent<DigShop>();
+        var pause = gameRoot.GetComponent<DigPause>();
+        if (pause == null) pause = gameRoot.gameObject.AddComponent<DigPause>();
         var audio = gameRoot.GetComponent<DigAudio>();
         if (audio == null) audio = gameRoot.gameObject.AddComponent<DigAudio>();
         WireAudio(audio);
@@ -1098,6 +1103,7 @@ public static partial class DigInSceneBuilder
         if (game.aim == null) game.aim = Find<DigAim>(scene);
         if (game.minerals == null) game.minerals = Find<DigMinerals>(scene);
         if (game.shop == null) game.shop = shop;
+        if (game.pause == null) game.pause = pause;
         if (game.atmosphere == null) game.atmosphere = atmosphere;
         if (shop.game == null) shop.game = game;
         if (game.player == null) game.player = player;
@@ -1126,6 +1132,11 @@ public static partial class DigInSceneBuilder
         EditorUtility.SetDirty(game);
 
         if (shop.hud == null) shop.hud = game.hud;
+        if (pause.game == null) pause.game = game;
+        if (pause.hud == null) pause.hud = game.hud;
+        var pauseBlur = FindRoot(scene, "Pause Blur");
+        if (pause.blur == null && pauseBlur != null) pause.blur = pauseBlur.GetComponent<Volume>();
+        EditorUtility.SetDirty(pause);
         BuildShopArt(shop, pendingMinerals);
         foreach (var l in Object.FindObjectsByType<DigLoosen>(FindObjectsInactive.Include))
         {

@@ -94,6 +94,25 @@ public class DigHud : MonoBehaviour
         public TMP_Text stamp;
     }
 
+    [Header("Pause menu (DigPause)")]
+    public CanvasGroup pauseGroup;
+    public GameObject pauseMain;
+    public GameObject pauseSettings;
+    public GameObject pauseConfirm;
+    public Button pauseResume;
+    public Button pauseHowTo;
+    public Button pauseSettingsButton;
+    public Button pauseQuit;
+    public Slider pauseVolume;
+    public Slider pauseSensitivity;
+    public Button pauseSettingsBack;
+    public Button pauseQuitYes;
+    public Button pauseQuitNo;
+
+    [Header("How to Play note")]
+    public CanvasGroup howToGroup;
+    public TMP_Text howToHint;
+
     [Header("Demo mode badge")]
     public CanvasGroup demoGroup;
 
@@ -105,6 +124,9 @@ public class DigHud : MonoBehaviour
     bool promptVisible;
     bool cardVisible;
     bool shopVisible;
+    bool pauseVisible;
+    float controlsTime;
+    bool howToVisible;
     float time;
 
     void Awake()
@@ -112,12 +134,13 @@ public class DigHud : MonoBehaviour
         if (scrapText != null) scrapBaseColor = scrapText.color;
         if (promptGroup != null) promptGroup.alpha = 0f;
         if (messageGroup != null) messageGroup.alpha = 0f;
-        if (controlsGroup != null) controlsGroup.alpha = 1f;
+        if (controlsGroup != null) controlsGroup.alpha = 0f;
         if (cardGroup != null) cardGroup.alpha = 0f;
         if (letter.group != null) letter.group.alpha = 0f;
         if (ending.group != null) ending.group.alpha = 0f;
         if (fadeGroup != null) fadeGroup.alpha = 0f;
         if (shopGroup != null) shopGroup.alpha = 0f;
+        if (pauseGroup != null) pauseGroup.alpha = 0f;
     }
 
     // Hides the status corner, the crosshair and the badge (the bedroom at the end).
@@ -177,6 +200,34 @@ public class DigHud : MonoBehaviour
             deltaTimer = Mathf.Max(0f, deltaTimer - dt);
             shopCoinsDelta.alpha = Mathf.Clamp01(deltaTimer / 0.6f) * 0.85f;
         }
+    }
+
+    // The pause menu: which of its pages shows.
+    public void ShowPause(bool visible, bool main, bool settings, bool confirm)
+    {
+        pauseVisible = visible;
+        Clickable(pauseGroup, visible);
+        if (pauseMain != null) pauseMain.SetActive(main);
+        if (pauseSettings != null) pauseSettings.SetActive(settings);
+        if (pauseConfirm != null) pauseConfirm.SetActive(confirm);
+        if (visible) messageTimer = 0f;
+    }
+
+    // The How to Play note; `first` is the very first time (before the game starts).
+    public void ShowHowTo(bool visible, bool first)
+    {
+        howToVisible = visible;
+        Clickable(howToGroup, false);   // any click puts it away; nothing on it is a button
+        if (howToHint != null) howToHint.text = first ? "Click to begin" : "Click to go back";
+        if (visible && first && howToGroup != null) howToGroup.alpha = 1f;   // there from the first frame
+        if (visible) messageTimer = 0f;
+    }
+
+    static void Clickable(CanvasGroup group, bool on)
+    {
+        if (group == null) return;
+        group.blocksRaycasts = on;
+        group.interactable = on;
     }
 
     // The cat's price board (DigShop fills it).
@@ -271,13 +322,16 @@ public class DigHud : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         time += dt;
         if (shopVisible) UpdateCoins(dt);
+        if (!howToVisible) controlsTime += dt;   // the strip waits until the note is put away
 
         if (messageTimer > 0f) messageTimer -= dt;
         Fade(messageGroup, messageTimer > 0f);
         Fade(promptGroup, promptVisible);
-        Fade(controlsGroup, time < controlsSeconds, 0.5f);
+        Fade(controlsGroup, controlsTime < controlsSeconds && !howToVisible && !pauseVisible, 0.5f);
         Fade(cardGroup, cardVisible, 1.5f);
         Fade(shopGroup, shopVisible, 2f);
+        Fade(pauseGroup, pauseVisible, 3f);
+        Fade(howToGroup, howToVisible, 2.5f);
         Fade(letter.group, letter.visible, 0.6f);
         Fade(ending.group, ending.visible, 0.35f);
         if (cardPanel != null && cardVisible)
