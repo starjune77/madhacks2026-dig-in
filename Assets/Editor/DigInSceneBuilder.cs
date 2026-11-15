@@ -38,14 +38,14 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v5 loaded blade";
-    const string FindVersion = "v2 kenney box";
-    const string ShelfVersion = "v2 bookcase";
-    const string BenchVersion = "v2 kenney bench";
+    const string PlayerVersion = "v8 meshy spade";
+    const string FindVersion = "v5 polyhaven";
+    const string ShelfVersion = "v4 meshy shelf";
+    const string BenchVersion = "v3 meshy counter";
     const string HudVersion = "v6 ending layout";
-    const string HubVersion = "v3 spawn height";      // marker child of scene/Surface Hub
-    const string DigSiteVersion = "v7 heaps";          // marker child of scene/Dig Site
-    const string EnvVersion = "v2 backyard";          // marker child of scene/Environment
+    const string HubVersion = "v4 realistic";         // marker child of scene/Surface Hub
+    const string DigSiteVersion = "v8 grass";           // marker child of scene/Dig Site
+    const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
     const string PageVersion = "v1 page";
 
     static readonly Color[] StrataColors =
@@ -114,9 +114,9 @@ public static partial class DigInSceneBuilder
         var playerPrefab = BuildPlayerPrefab(feel, rebuilt);
         var findPrefabs = new[]
         {
-            BuildFindPrefab("Memory Find", "FurnitureKit/cardboardBoxClosed", 0.26f, rebuilt),      // Childhood: a toy box
-            BuildFindPrefab("Memory Find School", "FurnitureKit/books", 0.22f, rebuilt),            // School Days
-            BuildFindPrefab("Memory Find Growing Up", "SurvivalKit/chest", 0.3f, rebuilt),          // Growing Up
+            BuildFindPrefab("Memory Find", "wicker_basket_01", 0.22f, rebuilt),          // Childhood: a little basket
+            BuildFindPrefab("Memory Find School", "wooden_crate_01", 0.2f, rebuilt),     // School Days: a small box
+            BuildFindPrefab("Memory Find Growing Up", "wooden_crate_01", 0.24f, rebuilt), // Growing Up
         };
         var shelfPrefab = BuildShelfPrefab(m, font, rebuilt);
         var benchPrefab = BuildWorkbenchPrefab(rebuilt);
@@ -124,7 +124,7 @@ public static partial class DigInSceneBuilder
         var hudPrefab = BuildHudPrefab(font, italic, rebuilt);
         ApplyFont(hudPrefab, font);
 
-        BuildLighting(m);
+        BuildRealisticLighting();
         BuildMeshyFinds(memories);
         Migrate(scene, rebuilt);
 
@@ -460,14 +460,13 @@ public static partial class DigInSceneBuilder
         pivot.localRotation = Quaternion.Euler(ShovelRestRot);
 
         // One Kenney shovel per level, told apart by size and tint (stand-ins until the real shovel).
-        var baseMat = KitMaterial("SurvivalKit/tool-shovel");
-        var toyMat = TintedMaterial("Shovel Toy", baseMat, new Color(1f, 0.62f, 0.38f), 0.45f, 0f);
-        var steelMat = TintedMaterial("Shovel Steel", KitMaterial("SurvivalKit/tool-shovel-upgraded"), new Color(0.86f, 0.9f, 1f), 0.6f, 0.35f);
+        // The old spade (Meshy) for every level: shorter at first, full length later.
+        var spade = MeshyAsset("Spade", 0.3f);
         shovel.models = new[]
         {
-            ShovelModel("Toy Shovel", pivot, "SurvivalKit/tool-shovel", 0.46f, toyMat),
-            ShovelModel("Garden Shovel", pivot, "SurvivalKit/tool-shovel", 0.54f, null),
-            ShovelModel("Steel Shovel", pivot, "SurvivalKit/tool-shovel-upgraded", 0.62f, steelMat),
+            ShovelModel("Toy Shovel", pivot, spade, 0.5f),
+            ShovelModel("Garden Shovel", pivot, spade, 0.58f),
+            ShovelModel("Steel Shovel", pivot, spade, 0.66f),
         };
         shovel.models[1].SetActive(false);
         shovel.models[2].SetActive(false);
@@ -501,24 +500,23 @@ public static partial class DigInSceneBuilder
 
     // DigShovel expects: origin = grip, handle along +Z to the blade. The Kenney shovel
     // stands along +Y with the grip at the bottom, so it is tipped forward 90 degrees.
-    static GameObject ShovelModel(string name, Transform parent, string kitModel, float length, Material tint)
+    static GameObject ShovelModel(string name, Transform parent, GameObject asset, float length)
     {
         var holder = new GameObject(name);
         holder.transform.SetParent(parent, false);
-        var model = InstantiateKit(kitModel, holder.transform);
-        if (model == null) return holder;
-        model.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        if (asset == null) return holder;
+        var model = (GameObject)PrefabUtility.InstantiatePrefab(asset, holder.transform);
+        // The spade stands with its blade at the bottom: tip it back so the grip is at the
+        // origin and the blade points along +Z, face up.
+        model.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+        model.transform.localPosition = Vector3.zero;
 
         var b = LocalBounds(holder.transform);
         model.transform.localScale *= length / Mathf.Max(0.001f, b.size.z);
         b = LocalBounds(holder.transform);
         model.transform.localPosition -= new Vector3(b.center.x, b.center.y, b.min.z);
 
-        foreach (var r in holder.GetComponentsInChildren<Renderer>())
-        {
-            r.shadowCastingMode = ShadowCastingMode.Off;
-            if (tint != null) r.sharedMaterials = r.sharedMaterials.Select(_ => tint).ToArray();
-        }
+        foreach (var r in holder.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
         return holder;
     }
 
@@ -541,8 +539,12 @@ public static partial class DigInSceneBuilder
         // Something someone kept: a small box, a stack of books, a chest.
         var holder = new GameObject("Model").transform;
         holder.SetParent(root.transform, false);
-        var model = InstantiateKit(kitModel, holder);
-        if (model != null) FitInside(model, holder, height: height);
+        var asset = PolyHavenAsset(kitModel);
+        if (asset != null)
+        {
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(asset, holder);
+            FitInside(model, holder, height: height);
+        }
         find.model = holder;
 
         var glowGo = new GameObject("Glow");
@@ -571,12 +573,13 @@ public static partial class DigInSceneBuilder
 
         var holder = new GameObject("Model").transform;
         holder.SetParent(root.transform, false);
-        var bookcase = InstantiateKit("FurnitureKit/bookcaseOpen", holder);
+        var shelfAsset = MeshyAsset("Bookshelf", 0.25f);
+        var bookcase = shelfAsset != null ? (GameObject)PrefabUtility.InstantiatePrefab(shelfAsset, holder) : null;
         Bounds b;
         if (bookcase != null)
         {
-            FitInside(bookcase, holder, height: 2.1f);
-            bookcase.transform.localScale = Vector3.Scale(bookcase.transform.localScale, new Vector3(1.5f, 1f, 1f));
+            bookcase.transform.localRotation = Quaternion.Euler(0f, ShelfYaw, 0f);
+            FitInside(bookcase, holder, height: 1.8f);
             b = LocalBounds(holder);
             bookcase.transform.localPosition -= new Vector3(b.center.x, b.min.y, b.center.z);
         }
@@ -588,7 +591,7 @@ public static partial class DigInSceneBuilder
         col.size = b.size;
 
         // Shelf board tops in the Kenney model, as a fraction of its height.
-        float[] rowTop = { 6.1f / 8.8f, 3.7f / 8.8f, 1.3f / 8.8f };
+        float[] rowTop = ShelfRows;
         var slotsRoot = new GameObject("Slots").transform;
         slotsRoot.SetParent(root.transform, false);
         shelf.slots = new MemoryShelf.Slot[9];
@@ -679,8 +682,13 @@ public static partial class DigInSceneBuilder
 
         var holder = new GameObject("Model").transform;
         holder.SetParent(root.transform, false);
-        var model = InstantiateKit("SurvivalKit/workbench", holder);
-        if (model != null) FitInside(model, holder, height: 0.95f);
+        var counter = MeshyAsset("ShopCounter", 0.2f);
+        if (counter != null)
+        {
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(counter, holder);
+            model.transform.localRotation = Quaternion.Euler(0f, CounterYaw, 0f);
+            FitInside(model, holder, height: 1.05f);
+        }
 
         var b = LocalBounds(holder);
         var col = root.AddComponent<BoxCollider>();
@@ -1018,6 +1026,7 @@ public static partial class DigInSceneBuilder
         scoops.debris = debrisGo.GetComponent<DigDebris>();
 
         BuildAimRing(feel).transform.SetParent(digSite, false);
+        BuildYardGrass(volume).transform.SetParent(digSite, false);
     }
 
     // The yard in front of the house's back door: spawn, memory shelf, workbench lean-to.
@@ -1039,14 +1048,10 @@ public static partial class DigInSceneBuilder
 
         Instance(shelfPrefab, hub, ShelfPos, 0f);
 
-        var leanTo = new GameObject("Lean-to").transform;
-        leanTo.SetParent(hub, false);
-        Instance(benchPrefab, leanTo, BenchPos, -90f);
-        // 2.6 m wide makes the kit's frame about 3.1 m tall: a shelter, not a gateway.
-        Place(leanTo, "SurvivalKit/structure-roof", BenchPos, -90f, width: 2.6f);
-        Place(leanTo, "SurvivalKit/resource-planks", BenchPos + new Vector3(0.3f, 0f, 1.9f), 10f, width: 1.2f);
-        Place(leanTo, "SurvivalKit/tool-pickaxe", BenchPos + new Vector3(0.8f, 0f, -0.8f), 30f, height: 0.6f);
-        Lantern(leanTo, BenchPos + new Vector3(2.1f, 0f, 2.0f), 2.1f);
+        // The shop corner: the counter, facing the yard.
+        var shop = new GameObject("Shop").transform;
+        shop.SetParent(hub, false);
+        Instance(benchPrefab, shop, BenchPos, -90f);
     }
 
     static void WireGame(Scene scene, MemoryData[] memories, LetterData[] letters, GameObject[] findPrefabs)

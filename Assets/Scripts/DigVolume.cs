@@ -272,8 +272,12 @@ public class DigVolume : MonoBehaviour
         MarkDirty(a, b);
     }
 
+    // Raised when the top of the ground is dug or covered (centre, radius): grass goes.
+    public event System.Action<Vector3, float> Disturbed;
+
     void Disturb(Vector3 point, float radius)
     {
+        Disturbed?.Invoke(point, radius);
         int x0 = Mathf.Max(0, Mathf.FloorToInt((point.x - radius - Min.x) / Voxel)), x1 = Mathf.Min(Nx - 1, Mathf.CeilToInt((point.x + radius - Min.x) / Voxel));
         int z0 = Mathf.Max(0, Mathf.FloorToInt((point.z - radius - Min.z) / Voxel)), z1 = Mathf.Min(Nz - 1, Mathf.CeilToInt((point.z + radius - Min.z) / Voxel));
         for (int z = z0; z <= z1; z++)

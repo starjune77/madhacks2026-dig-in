@@ -64,7 +64,18 @@ public static partial class DigInSceneBuilder
         Put(mat, "_DirtFloor", LoadSoilMap(DirtFloor));
         Put(mat, "_Clay", LoadSoilMap(Clay));
         Put(mat, "_Stone", LoadSoilMap(Stone));
-        Put(mat, "_Grass", LoadSoilMap(Grass));
+        var grassLayer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(DemoPack + "/Terrain/Grass_A/Grass_A.terrainlayer");
+        if (grassLayer != null)
+        {
+            // The same grass as the terrain around the yard. Its mask map holds AO in G, not R,
+            // so the soil shader gets no AO map for grass.
+            mat.SetTexture("_GrassDiff", grassLayer.diffuseTexture);
+            mat.SetTexture("_GrassNrm", grassLayer.normalMapTexture);
+            mat.SetTexture("_GrassAO", null);
+            mat.SetFloat("_GrassScale", 1f / Mathf.Max(0.1f, grassLayer.tileSize.x));
+            mat.SetColor("_GrassTint", Color.white);
+        }
+        else Put(mat, "_Grass", LoadSoilMap(Grass));
         if (fresh)
         {
             mat.SetColor("_DirtTint", SoilTints[0]);

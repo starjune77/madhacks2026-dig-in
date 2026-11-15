@@ -60,15 +60,15 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _GrassAO:
-        m_Texture: {fileID: 2800000, guid: 665099d1ac2b9c1468247f2f5fc2e11f, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _GrassDiff:
-        m_Texture: {fileID: 2800000, guid: 5aaae1c51f7406f4eb7b8ded09f6fbc0, type: 3}
+        m_Texture: {fileID: 2800000, guid: 7567776d6957b0a41a0724b0366465f8, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _GrassNrm:
-        m_Texture: {fileID: 2800000, guid: 1bf731c3f96215f4b982700661cf4349, type: 3}
+        m_Texture: {fileID: 2800000, guid: 47dab73a1d2b8a944bf398de48e23843, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _StoneAO:
@@ -88,7 +88,7 @@ Material:
     - _AOStrength: 0.8
     - _ClayScale: 0.5
     - _DirtScale: 0.55
-    - _GrassScale: 0.5
+    - _GrassScale: 0.05
     - _Macro: 0.25
     - _Moist: 0.28
     - _Mottle: 0.35
@@ -101,7 +101,7 @@ Material:
     - _DirtTint: {r: 0.98, g: 0.92, b: 0.86, a: 1}
     - _GrassColor: {r: 0.47, g: 0.54, b: 0.28, a: 1}
     - _GrassDark: {r: 0.38, g: 0.46, b: 0.23, a: 1}
-    - _GrassTint: {r: 0.95, g: 1, b: 0.82, a: 1}
+    - _GrassTint: {r: 1, g: 1, b: 1, a: 1}
     - _StoneColor: {r: 0.34, g: 0.33, b: 0.34, a: 1}
     - _StoneTint: {r: 0.86, g: 0.86, b: 0.88, a: 1}
     - _WarmTint: {r: 1.22, g: 1.06, b: 0.82, a: 1}

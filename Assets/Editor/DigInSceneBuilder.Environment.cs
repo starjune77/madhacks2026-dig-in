@@ -6,52 +6,41 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
-// The world around the shaft, built from the imported Kenney kits:
+// The world around the dig, realistic:
 //
-//   Backyard (south of the shaft): the old family house's back wall with the door, the
-//   memory shelf beside it, a workbench under a lean-to, a fence, lanterns, odds and ends.
-//   The shaft itself gets a plank frame.
-//   Excavation (north, past the back fence): terraces stepping down 3 m at a time, their
-//   faces banded dirt / clay / stone like the shaft walls, a ramp, a small camp and props.
-//   Rock formations frame the view; pine-covered hills ring everything and fade into fog.
+//   The backyard: an old family house (Meshy) whose back door opens onto the yard, the
+//   memory shelf beside the door, the cat's shop corner, a weathered picket fence (Meshy),
+//   garden things (Poly Haven), real grass (DigGrass, on the diggable ground).
+//   Around it: Unity Terrain with the demo pack's photoscanned grass layers, detail grass
+//   and ferns, SpeedTree conifers and cypresses on the hills, Poly Haven boulders.
 //
-// Models are placed by their measured bounds, so it does not matter which units or pivots
-// a kit uses. Modular pieces (walls, fences) are turned by measuring which side of the
-// tile their slab sits on.
+// Models are placed by their measured bounds, so units and pivots do not matter.
 public static partial class DigInSceneBuilder
 {
     // ---- Layout ----------------------------------------------------------------
     static readonly Vector3 ShelfPos = new Vector3(0.8f, 0f, -15.35f);
-    static readonly Vector3 BenchPos = new Vector3(12.3f, 0f, -7f);
+    static readonly Vector3 BenchPos = new Vector3(12.3f, 0f, -7f);     // the cat's shop
     static readonly Vector3 SpawnPos = new Vector3(3f, 0.8f, -8f);
     static readonly Vector2 DigStart = new Vector2(2.5f, 2.5f);      // the hollow where the dig begins
 
     const float YardMinX = -12f, YardMaxX = 17f, YardMinZ = -16f, YardMaxZ = 10f;
-    const float HouseTile = 3.2f;          // one Fantasy Town tile, scaled up
-    const float HouseMinX = -4f;           // west end of the house
-    const int HouseTiles = 4;
-    const int DoorTile = 2;
+    const float HouseMinX = -4f, HouseMaxX = 9.6f;   // the house's back wall runs along z = YardMinZ
+    const float HouseYaw = 0f;                       // turns the Meshy house so its back door faces the yard
 
     // Terrain: 256 m square, 0.5 m height cells. It has a hole exactly over the dig volume
     // (DigVolume), which draws and collides the ground there instead.
     const float TerrainSize = 256f, TerrainBaseY = -14f, TerrainHeight = 52f;
     static readonly Vector3 TerrainOrigin = new Vector3(-126f, TerrainBaseY, -126f);
-    const int HeightRes = 513, SplatRes = 1024;
+    const int HeightRes = 513, SplatRes = 512, DetailRes = 512;
 
     static void BuildEnvironment(Scene scene)
     {
-        if (!AssetDatabase.IsValidFolder(KenneyDir))
-        {
-            report.AppendLine("  environment skipped: " + KenneyDir + " is missing");
-            return;
-        }
-
         var env = Root(scene, "Environment", out bool created);
         if (created) new GameObject(EnvVersion).transform.SetParent(env, false);
         Ensure(env, "Terrain", BuildTerrain);
         Ensure(env, "House", BuildHouse);
         Ensure(env, "Yard", BuildYard);
-        Ensure(env, "Rock Formations", BuildFormations);
+        Ensure(env, "Rocks and Trees", BuildSurroundings);
     }
 
     // ---- Height function (shared by terrain and prop placement) --------------------
@@ -66,11 +55,11 @@ public static partial class DigInSceneBuilder
 
     static float GroundHeight(float x, float z)
     {
-        // The yard (and house) is flat at 0; mounds grow away from it, hills ring everything.
+        // The yard (and house) is flat at 0; gentle meadow swells away from it, hills ring everything.
         float dYard = RectDistance(x, z, YardMinX - 2f, YardMaxX + 2f, YardMinZ - 5f, YardMaxZ + 1.5f);
-        float mound = (Mathf.PerlinNoise(x * 0.035f + 20f, z * 0.035f + 40f) - 0.45f) * 5f * Smooth(2f, 22f, dYard);
-        float r = Vector2.Distance(new Vector2(x, z), new Vector2(2.5f, 10f));
-        float hills = Smooth(55f, 115f, r) * (14f + 18f * Mathf.PerlinNoise(x * 0.013f + 11f, z * 0.013f + 5f));
+        float mound = (Mathf.PerlinNoise(x * 0.03f + 20f, z * 0.03f + 40f) - 0.45f) * 3.5f * Smooth(2f, 26f, dYard);
+        float r = Vector2.Distance(new Vector2(x, z), new Vector2(2.5f, 0f));
+        float hills = Smooth(50f, 115f, r) * (12f + 16f * Mathf.PerlinNoise(x * 0.013f + 11f, z * 0.013f + 5f));
 
         // The slight hollow in the grass where the dig begins.
         float hollow = 0.32f * (1f - Smooth(0.3f, 2.4f, Vector2.Distance(new Vector2(x, z), DigStart)));
@@ -86,6 +75,10 @@ public static partial class DigInSceneBuilder
     }
 
     static Vector3 OnGround(float x, float z, float sink = 0f) => new Vector3(x, GroundHeight(x, z) - sink, z);
+
+    static bool InVolume(float x, float z, float margin) =>
+        x > DigVolume.Min.x - margin && x < DigVolume.Min.x + DigVolume.Size.x + margin &&
+        z > DigVolume.Min.z - margin && z < DigVolume.Min.z + DigVolume.Size.z + margin;
 
     // ---- Terrain ------------------------------------------------------------------
     static GameObject BuildTerrain()
@@ -103,14 +96,13 @@ public static partial class DigInSceneBuilder
 
             data.terrainLayers = new[]
             {
-                GroundLayer("Grass", new Color(0.45f, 0.52f, 0.27f)),
-                GroundLayer("Dirt", StrataColors[0]),
-                GroundLayer("Clay", StrataColors[1]),
-                GroundLayer("Stone", StrataColors[2]),
+                AssetDatabase.LoadAssetAtPath<TerrainLayer>(DemoPack + "/Terrain/Grass_A/Grass_A.terrainlayer"),
+                AssetDatabase.LoadAssetAtPath<TerrainLayer>(DemoPack + "/Terrain/Grass_Soil_A/Grass_Soil_A.terrainlayer"),
             };
             FillHeights(data);
             FillSplat(data);
             FillTrees(data);
+            FillDetails(data);
             EditorUtility.SetDirty(data);
             AssetDatabase.SaveAssets();
             Created(dataPath);
@@ -121,49 +113,15 @@ public static partial class DigInSceneBuilder
         var terrain = go.GetComponent<Terrain>();
         terrain.materialTemplate = LoadOrCreate(TerrainDir + "/Terrain.mat",
             () => new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit")));
-        terrain.heightmapPixelError = 4f;
-        terrain.basemapDistance = 300f;
-        terrain.treeDistance = 400f;
-        terrain.treeBillboardDistance = 400f;
+        terrain.heightmapPixelError = 3f;
+        terrain.basemapDistance = 400f;
+        terrain.treeDistance = 600f;
+        terrain.treeBillboardDistance = 120f;
+        terrain.treeCrossFadeLength = 20f;
+        terrain.detailObjectDistance = 90f;
+        terrain.detailObjectDensity = 1f;
         terrain.drawInstanced = true;
         return go;
-    }
-
-    static TerrainLayer GroundLayer(string name, Color color)
-    {
-        string texPath = TexDir + "/Ground " + name + ".png";
-        if (AssetDatabase.LoadAssetAtPath<Texture2D>(texPath) == null)
-        {
-            // Nearly flat colour with soft mottling, to suit the low-poly kits.
-            const int n = 128;
-            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false);
-            var rng = new System.Random(name.GetHashCode());
-            for (int y = 0; y < n; y++)
-            for (int x = 0; x < n; x++)
-            {
-                float u = (float)x / n * Mathf.PI * 2f, v = (float)y / n * Mathf.PI * 2f;
-                // Tileable noise from periodic Perlin samples.
-                float k = Mathf.PerlinNoise(Mathf.Cos(u) * 1.5f + 10f, Mathf.Sin(v) * 1.5f + Mathf.Sin(u) + 10f);
-                float speck = (float)rng.NextDouble() < 0.04f ? -0.06f : 0f;
-                float shade = 0.93f + 0.12f * k + speck;
-                tex.SetPixel(x, y, new Color(color.r * shade, color.g * shade, color.b * shade, 1f));
-            }
-            File.WriteAllBytes(texPath, tex.EncodeToPNG());
-            Object.DestroyImmediate(tex);
-            AssetDatabase.ImportAsset(texPath);
-            var importer = (TextureImporter)AssetImporter.GetAtPath(texPath);
-            importer.wrapMode = TextureWrapMode.Repeat;
-            importer.SaveAndReimport();
-            Created(texPath);
-        }
-
-        return LoadOrCreate(TerrainDir + "/" + name + ".terrainlayer", () => new TerrainLayer
-        {
-            diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath),
-            tileSize = new Vector2(4f, 4f),
-            smoothness = 0f,
-            metallic = 0f,
-        });
     }
 
     static void FillHeights(TerrainData data)
@@ -185,115 +143,126 @@ public static partial class DigInSceneBuilder
         data.SetHoles(startX, startZ, new bool[countZ, countX]);   // false = hole
     }
 
-    // Layers: 0 grass, 1 dirt, 2 clay, 3 stone. Grass, with rock showing on steep hillsides.
+    // Layers: 0 meadow grass, 1 grass worn down to soil (patches and steep ground).
     static void FillSplat(TerrainData data)
     {
         float cell = TerrainSize / SplatRes;
-        var a = new float[SplatRes, SplatRes, 4];
+        var a = new float[SplatRes, SplatRes, 2];
         for (int iz = 0; iz < SplatRes; iz++)
         for (int ix = 0; ix < SplatRes; ix++)
         {
             float x = TerrainOrigin.x + (ix + 0.5f) * cell, z = TerrainOrigin.z + (iz + 0.5f) * cell;
-            float rock = Smooth(30f, 42f, Slope(x, z));
-            a[iz, ix, 0] = 1f - rock;
-            a[iz, ix, 1] = rock * 0.3f;
-            a[iz, ix, 3] = rock * 0.7f;
+            float soil = Mathf.Max(Smooth(22f, 36f, Slope(x, z)), Smooth(0.62f, 0.78f, Mathf.PerlinNoise(x * 0.06f + 3f, z * 0.06f + 9f)) * 0.8f);
+            a[iz, ix, 0] = 1f - soil;
+            a[iz, ix, 1] = soil;
         }
         data.SetAlphamaps(0, 0, a);
     }
 
-    // Pines on the surrounding hills, kept away from the yard and the excavation.
+    // SpeedTree conifers and cypresses on the hills; a few cypresses closer in.
     static void FillTrees(TerrainData data)
     {
-        string[] pines =
-        {
-            "NatureKit/tree_pineTallA", "NatureKit/tree_pineTallB", "NatureKit/tree_pineTallC", "NatureKit/tree_pineTallD",
-            "NatureKit/tree_pineRoundA", "NatureKit/tree_pineRoundC", "NatureKit/tree_pineDefaultA", "NatureKit/tree_pineDefaultB",
-        };
-        var protos = new List<TreePrototype>();
-        var heights = new List<float>();
-        foreach (var p in pines)
-        {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(KenneyDir + "/" + p + ".fbx");
-            if (prefab == null) continue;
-            protos.Add(new TreePrototype { prefab = prefab });
-            heights.Add(ModelHeight(p));
-        }
-        if (protos.Count == 0) return;
-        data.treePrototypes = protos.ToArray();
+        var conifer = AssetDatabase.LoadAssetAtPath<GameObject>(DemoPack + "/Prefabs/Trees/Conifer/Conifer.prefab");
+        var cypress = AssetDatabase.LoadAssetAtPath<GameObject>(DemoPack + "/Prefabs/Trees/Cypress/Cypress_Forest_Desktop.prefab");
+        if (conifer == null || cypress == null) { report.AppendLine("  MISSING SpeedTree prefabs in " + DemoPack); return; }
+        data.treePrototypes = new[] { new TreePrototype { prefab = conifer }, new TreePrototype { prefab = cypress } };
 
         var rng = new System.Random(4242);
         var trees = new List<TreeInstance>();
-        for (float z = TerrainOrigin.z + 3f; z < TerrainOrigin.z + TerrainSize - 3f; z += 4.5f)
-        for (float x = TerrainOrigin.x + 3f; x < TerrainOrigin.x + TerrainSize - 3f; x += 4.5f)
+        for (float z = TerrainOrigin.z + 3f; z < TerrainOrigin.z + TerrainSize - 3f; z += 5f)
+        for (float x = TerrainOrigin.x + 3f; x < TerrainOrigin.x + TerrainSize - 3f; x += 5f)
         {
-            float px = x + (float)(rng.NextDouble() - 0.5) * 3.5f;
-            float pz = z + (float)(rng.NextDouble() - 0.5) * 3.5f;
-            float r = Vector2.Distance(new Vector2(px, pz), new Vector2(2.5f, 10f));
-            if (r < 34f) continue;
-            if (px > DigVolume.Min.x - 1f && px < DigVolume.Min.x + DigVolume.Size.x + 1f &&
-                pz > DigVolume.Min.z - 1f && pz < DigVolume.Min.z + DigVolume.Size.z + 1f) continue;   // the dig volume's ground
-            if (RectDistance(px, pz, YardMinX, YardMaxX, YardMinZ - 4f, YardMaxZ) < 8f) continue;
-            if (Slope(px, pz) > 34f) continue;
-
-            float density = Mathf.PerlinNoise(px * 0.04f + 70f, pz * 0.04f + 30f);
-            float threshold = Mathf.Lerp(0.72f, 0.38f, Smooth(34f, 80f, r));   // sparse near, dense far
+            float px = x + (float)(rng.NextDouble() - 0.5) * 4f;
+            float pz = z + (float)(rng.NextDouble() - 0.5) * 4f;
+            if (InVolume(px, pz, 2f)) continue;
+            float r = Vector2.Distance(new Vector2(px, pz), new Vector2(2.5f, 0f));
+            if (Slope(px, pz) > 32f) continue;
+            float density = Mathf.PerlinNoise(px * 0.035f + 70f, pz * 0.035f + 30f);
+            float threshold = Mathf.Lerp(0.78f, 0.36f, Smooth(32f, 90f, r));   // sparse near, dense far
             if (density < threshold) continue;
 
-            int k = rng.Next(protos.Count);
-            float size = Mathf.Lerp(6f, 11f, (float)rng.NextDouble()) / Mathf.Max(0.1f, heights[k]);
+            bool near = r < 55f;
+            int k = near ? (rng.NextDouble() < 0.7 ? 1 : 0) : (rng.NextDouble() < 0.75 ? 0 : 1);
+            float s = k == 0 ? Mathf.Lerp(0.45f, 0.8f, (float)rng.NextDouble()) : Mathf.Lerp(0.8f, 1.25f, (float)rng.NextDouble());
             trees.Add(new TreeInstance
             {
                 prototypeIndex = k,
-                position = new Vector3((px - TerrainOrigin.x) / TerrainSize,
-                                       (GroundHeight(px, pz) - TerrainBaseY) / TerrainHeight,
-                                       (pz - TerrainOrigin.z) / TerrainSize),
-                widthScale = size,
-                heightScale = size,
+                position = new Vector3((px - TerrainOrigin.x) / TerrainSize, (GroundHeight(px, pz) - TerrainBaseY) / TerrainHeight, (pz - TerrainOrigin.z) / TerrainSize),
+                widthScale = s, heightScale = s * Mathf.Lerp(0.9f, 1.1f, (float)rng.NextDouble()),
                 rotation = (float)rng.NextDouble() * Mathf.PI * 2f,
-                color = Color.white,
-                lightmapColor = Color.white,
+                color = Color.white, lightmapColor = Color.white,
             });
         }
         data.SetTreeInstances(trees.ToArray(), true);
-        report.AppendLine("  placed " + trees.Count + " pines");
+        report.AppendLine("  placed " + trees.Count + " SpeedTrees");
+    }
+
+    // Detail meshes from the demo pack (grass clumps, dry grass, ferns), denser near the yard.
+    static readonly string[] DetailPrefabs = { "Grass_B", "Grass_C", "Grass_D", "GrassDry_A", "Fern_A", "Grass_A" };
+
+    static void FillDetails(TerrainData data)
+    {
+        var protos = new List<DetailPrototype>();
+        foreach (var n in DetailPrefabs)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(DemoPack + "/Prefabs/Details/" + n + ".prefab");
+            if (prefab == null) continue;
+            protos.Add(new DetailPrototype
+            {
+                prototype = prefab, usePrototypeMesh = true, useInstancing = true, renderMode = DetailRenderMode.VertexLit,
+                minWidth = 0.8f, maxWidth = 1.3f, minHeight = 0.8f, maxHeight = 1.3f, noiseSpread = 0.4f, useDensityScaling = true,
+                alignToGround = 0.6f, positionJitter = 0.9f,
+            });
+        }
+        data.SetDetailResolution(DetailRes, 32);
+        data.detailPrototypes = protos.ToArray();
+        data.RefreshPrototypes();
+
+        float cell = TerrainSize / DetailRes;
+        var rng = new System.Random(99);
+        for (int k = 0; k < protos.Count; k++)
+        {
+            var map = new int[DetailRes, DetailRes];
+            for (int iz = 0; iz < DetailRes; iz++)
+            for (int ix = 0; ix < DetailRes; ix++)
+            {
+                float x = TerrainOrigin.x + (ix + 0.5f) * cell, z = TerrainOrigin.z + (iz + 0.5f) * cell;
+                if (InVolume(x, z, 0f)) continue;
+                float r = Vector2.Distance(new Vector2(x, z), new Vector2(2.5f, 0f));
+                if (r > 95f) continue;
+                float patch = Mathf.PerlinNoise(x * 0.08f + k * 13f, z * 0.08f + k * 7f);
+                float want = k == 0 || k == 1 ? 2.2f : k == 2 ? 1.4f : k == 3 ? 1.0f * patch : k == 4 ? (patch > 0.62f ? 1.2f : 0f) : 2f;
+                want *= Mathf.Lerp(1f, 0.35f, Smooth(40f, 95f, r));
+                int n = Mathf.FloorToInt(want);
+                if (rng.NextDouble() < want - n) n++;
+                map[iz, ix] = n;
+            }
+            data.SetDetailLayer(0, 0, k, map);
+        }
     }
 
     // ---- House --------------------------------------------------------------------
-    // A narrow two-storey wooden house, back wall facing the yard (+Z).
+    // The Meshy house, scaled to span the back of the yard; a collider keeps you out.
     static GameObject BuildHouse()
     {
         var house = new GameObject("House");
-        float scale = KitScale("FantasyTownKit/wall-wood", HouseTile);
-        float zc = YardMinZ - HouseTile * 0.5f;
-
-        for (int floor = 0; floor < 2; floor++)
+        var model = MeshyAsset("House", 0.15f);
+        float width = HouseMaxX - HouseMinX;
+        var go = model != null ? PlaceAsset(house.transform, model, Vector3.zero, HouseYaw, width: width) : null;
+        if (go != null)
         {
-            float y = floor * HouseTile;
-            for (int i = 0; i < HouseTiles; i++)
-            {
-                var c = new Vector3(HouseMinX + HouseTile * (i + 0.5f), y, zc);
-                string back = floor == 0
-                    ? (i == DoorTile ? "wall-wood-door" : i == DoorTile - 1 ? "wall-wood" : "wall-wood-window-shutters")
-                    : (i % 2 == 0 ? "wall-wood-window-glass" : "wall-wood-window-small");
-                Edge(house.transform, "FantasyTownKit/" + back, c, Vector3.forward, scale, true);
-                Edge(house.transform, "FantasyTownKit/" + (i == 1 && floor == 0 ? "wall-wood-window-small" : "wall-wood"), c, Vector3.back, scale, true);
-                if (i == 0) Edge(house.transform, "FantasyTownKit/" + (floor == 0 ? "wall-wood" : "wall-wood-window-round"), c, Vector3.left, scale, true);
-                if (i == HouseTiles - 1) Edge(house.transform, "FantasyTownKit/wall-wood", c, Vector3.right, scale, true);
-            }
-        }
-        for (int i = 0; i < HouseTiles; i++)
-        {
-            var roof = InstantiateKit("FantasyTownKit/roof-gable", house.transform);
-            if (roof == null) continue;
-            roof.transform.localScale = Vector3.one * scale;
-            roof.transform.position = new Vector3(HouseMinX + HouseTile * (i + 0.5f), 2f * HouseTile, zc);
+            var b = WorldBounds(go);
+            go.transform.position += new Vector3((HouseMinX + HouseMaxX) * 0.5f - b.center.x, 0f, YardMinZ - b.max.z + 0.25f);
+            var col = house.AddComponent<BoxCollider>();
+            b = WorldBounds(go);
+            col.center = b.center;
+            col.size = b.size - new Vector3(0f, 0f, 0.5f);
         }
 
-        // Back step and a lamp by the door.
-        float doorX = HouseMinX + HouseTile * (DoorTile + 0.5f);
-        Place(house.transform, "FantasyTownKit/stairs-wood", new Vector3(doorX, 0f, YardMinZ + 0.35f), 0f, height: 0.35f, collider: true);
-        Lantern(house.transform, new Vector3(doorX + 1.9f, 0f, YardMinZ + 0.6f), 2.0f);
+        // By the back door: a rocking chair and potted plants.
+        Prop(house.transform, "Rockingchair_01", new Vector3(6.4f, 0f, YardMinZ + 0.9f), 200f, height: 1.0f, collider: true);
+        Prop(house.transform, "shrub_04", new Vector3(-3.4f, 0f, YardMinZ + 0.7f), 0f, height: 0.7f);
+        Prop(house.transform, "fern_02", new Vector3(9.4f, 0f, YardMinZ + 0.8f), 30f, height: 0.6f);
         return house;
     }
 
@@ -304,96 +273,97 @@ public static partial class DigInSceneBuilder
         var t = yard.transform;
 
         // Fence on three sides; the house closes the south side.
-        float houseMaxX = HouseMinX + HouseTile * HouseTiles;
-        FenceLine(t, new Vector3(YardMinX, 0f, YardMinZ), new Vector3(YardMinX, 0f, YardMaxZ), Vector3.left, -1f);
-        FenceLine(t, new Vector3(YardMaxX, 0f, YardMinZ), new Vector3(YardMaxX, 0f, YardMaxZ), Vector3.right, -1f);
-        FenceLine(t, new Vector3(YardMinX, 0f, YardMaxZ), new Vector3(YardMaxX, 0f, YardMaxZ), Vector3.forward, 2.5f);
-        FenceLine(t, new Vector3(YardMinX, 0f, YardMinZ), new Vector3(HouseMinX - 0.2f, 0f, YardMinZ), Vector3.back, -1f);
-        FenceLine(t, new Vector3(houseMaxX + 0.2f, 0f, YardMinZ), new Vector3(YardMaxX, 0f, YardMinZ), Vector3.back, -1f);
-
-        // Odds and ends of a lived-in yard.
-        Place(t, "SurvivalKit/barrel", new Vector3(15.3f, 0f, -13.8f), 20f, height: 0.95f, collider: true);
-        Place(t, "SurvivalKit/barrel-open", new Vector3(14.2f, 0f, -14.5f), 0f, height: 0.95f, collider: true);
-        Place(t, "SurvivalKit/box-large", new Vector3(-10.3f, 0f, -14.2f), 15f, height: 0.8f, collider: true);
-        Place(t, "SurvivalKit/box", new Vector3(-9.4f, 0f, -13.3f), -20f, height: 0.5f, collider: true);
-        Place(t, "NatureKit/log_stack", new Vector3(-10.6f, 0f, -6f), 90f, height: 1.1f, collider: true);
-        Place(t, "FantasyTownKit/cart", new Vector3(-8.8f, 0f, 4.2f), 60f, height: 1.7f, collider: true);
-        Place(t, "SurvivalKit/bucket", new Vector3(6.5f, 0f, -0.9f), 0f, height: 0.42f, collider: true);
-        Place(t, "SurvivalKit/bucket", new Vector3(-1.4f, 0f, 6.2f), 40f, height: 0.42f, collider: true);
-        Place(t, "SurvivalKit/resource-stone-large", new Vector3(7.2f, 0f, 4.6f), 30f, height: 0.7f, collider: true);
-        Place(t, "SurvivalKit/signpost", new Vector3(5.2f, 0f, 9.1f), 0f, height: 1.6f);
-
-        Place(t, "NatureKit/plant_bushLarge", new Vector3(-2.6f, 0f, YardMinZ + 0.6f), 0f, height: 1.0f);
-        Place(t, "NatureKit/plant_bushLarge", new Vector3(7.7f, 0f, YardMinZ + 0.6f), 90f, height: 0.9f);
-        Place(t, "NatureKit/plant_bush", new Vector3(-11.2f, 0f, -10f), 0f, height: 0.7f);
-        Place(t, "NatureKit/plant_bush", new Vector3(16.2f, 0f, 2f), 0f, height: 0.7f);
-        Place(t, "NatureKit/flower_yellowA", new Vector3(-1.7f, 0f, YardMinZ + 0.5f), 0f, height: 0.35f);
-        Place(t, "NatureKit/flower_redA", new Vector3(6.7f, 0f, YardMinZ + 0.5f), 0f, height: 0.35f);
-        Place(t, "NatureKit/flower_purpleA", new Vector3(-3.4f, 0f, YardMinZ + 0.9f), 0f, height: 0.35f);
-
-        // Grass tufts, away from the path and the shaft.
-        var rng = new System.Random(77);
-        for (int n = 0, tries = 0; n < 40 && tries < 400; tries++)
+        var fence = MeshyAsset("Fence", 0.12f);
+        if (fence != null)
         {
-            float x = Mathf.Lerp(YardMinX + 0.8f, YardMaxX - 0.8f, (float)rng.NextDouble());
-            float z = Mathf.Lerp(YardMinZ + 1.5f, YardMaxZ - 0.8f, (float)rng.NextDouble());
-            if (Vector2.Distance(new Vector2(x, z), DigStart) < 5.2f) continue;   // the bare patch
-            if (Mathf.Abs(x - 3f) < 1.6f && z < 0f) continue;
-            if (Vector2.Distance(new Vector2(x, z), new Vector2(BenchPos.x, BenchPos.z)) < 2.5f) continue;
-            Place(t, rng.NextDouble() < 0.5 ? "NatureKit/grass_large" : "NatureKit/grass", new Vector3(x, 0f, z),
-                (float)rng.NextDouble() * 360f, height: 0.25f + 0.2f * (float)rng.NextDouble());
-            n++;
+            FenceRun(t, fence, new Vector3(YardMinX, 0f, YardMinZ - 3f), new Vector3(YardMinX, 0f, YardMaxZ));
+            FenceRun(t, fence, new Vector3(YardMaxX, 0f, YardMinZ - 3f), new Vector3(YardMaxX, 0f, YardMaxZ));
+            FenceRun(t, fence, new Vector3(YardMinX, 0f, YardMaxZ), new Vector3(YardMaxX, 0f, YardMaxZ));
+            // Behind the house too: where the house stands, the fence is hidden inside it.
+            FenceRun(t, fence, new Vector3(YardMinX, 0f, YardMinZ - 3f), new Vector3(YardMaxX, 0f, YardMinZ - 3f));
         }
 
-        // Trees just outside the fence.
-        Place(t, "NatureKit/tree_oak", new Vector3(-15.5f, 0f, -13f), 0f, height: 7f);
-        Place(t, "NatureKit/tree_default", new Vector3(20.5f, 0f, -12f), 40f, height: 6f);
-        Place(t, "NatureKit/tree_detailed", new Vector3(-15.5f, 0f, 5f), 90f, height: 7.5f);
-        Place(t, "NatureKit/tree_fat", new Vector3(21f, 0f, 4f), 0f, height: 5.5f);
-        Place(t, "NatureKit/tree_oak_fall", new Vector3(-13.5f, 0f, -21f), 200f, height: 7f);
-
-        // Evening lamps.
-        Lantern(t, new Vector3(YardMinX + 0.7f, 0f, YardMaxZ - 0.7f), 2.2f);
-        Lantern(t, new Vector3(YardMaxX - 0.7f, 0f, YardMaxZ - 0.7f), 2.2f);
+        // Garden things, a lived-in yard.
+        Prop(t, "wooden_barrels_01", new Vector3(15.1f, 0f, -14.2f), 20f, height: 1.0f, collider: true);
+        Prop(t, "wooden_crate_01", new Vector3(-10.3f, 0f, -14.2f), 15f, height: 0.45f, collider: true);
+        Prop(t, "wooden_crate_01", new Vector3(-9.3f, 0f, -13.6f), -20f, height: 0.42f, collider: true);
+        Prop(t, "WoodenTable_03", new Vector3(-6.8f, 0f, -12.6f), 80f, height: 0.78f, collider: true);
+        Prop(t, "wicker_basket_01", new Vector3(-6.8f, 0.78f, -12.4f), 10f, height: 0.25f);
+        Prop(t, "dead_tree_trunk", new Vector3(-10.4f, 0f, -5.5f), 85f, height: 0.4f, collider: true);
+        Prop(t, "tree_stump_01", new Vector3(-9f, 0f, 4.5f), 0f, height: 0.55f, collider: true);
+        Prop(t, "fern_02", new Vector3(-8.2f, 0f, 5.4f), 120f, height: 0.5f);
+        Prop(t, "watering_can_metal_01", new Vector3(6.6f, 0f, -1.4f), 140f, height: 0.36f, collider: true);
+        Prop(t, "garden_gnome", new Vector3(5.8f, 0f, 8.7f), 190f, height: 0.42f, collider: true);
+        Prop(t, "boulder_01", new Vector3(8.2f, 0f, 5.2f), 30f, height: 0.75f, collider: true);
+        Prop(t, "rock_moss_set_01", new Vector3(-11f, 0f, 9f), 0f, height: 0.6f);
+        Prop(t, "shrub_02", new Vector3(-10.2f, 0f, 8.6f), 10f, height: 1.5f);
+        Prop(t, "shrub_02", new Vector3(15.6f, 0f, 8.4f), 190f, height: 1.4f);
+        Prop(t, "shrub_04", new Vector3(16.2f, 0f, 1.8f), 0f, height: 0.7f);
+        Prop(t, "shrub_04", new Vector3(-11.3f, 0f, -9.5f), 90f, height: 0.8f);
         return yard;
     }
 
-    // Fence segments from a to b; slabs sit on the `outward` side. A gate replaces the
-    // segment nearest gateX (pass a negative value for no gate).
-    static void FenceLine(Transform parent, Vector3 a, Vector3 b, Vector3 outward, float gateX)
+    // Fence sections from a to b, each scaled to fit, posts lined up.
+    static void FenceRun(Transform parent, GameObject fence, Vector3 a, Vector3 b)
     {
         float length = Vector3.Distance(a, b);
-        int n = Mathf.Max(1, Mathf.RoundToInt(length / 2.5f));
+        int n = Mathf.Max(1, Mathf.RoundToInt(length / 2.6f));
         float seg = length / n;
-        float scale = KitScale("FantasyTownKit/fence", seg);
         Vector3 dir = (b - a).normalized;
-        int gate = gateX < 0f ? -1 : Mathf.Clamp(Mathf.FloorToInt((gateX - a.x) / seg), 0, n - 1);
+        float yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+
+        // Which way is the model long? Sections run along that axis.
+        var probe = (GameObject)PrefabUtility.InstantiatePrefab(fence);
+        var pb = WorldBounds(probe);
+        Object.DestroyImmediate(probe);
+        float modelYaw = pb.size.x >= pb.size.z ? -90f : 0f;
+
         for (int i = 0; i < n; i++)
         {
-            Vector3 c = a + dir * (seg * (i + 0.5f)) - outward * (seg * 0.5f);
-            var piece = Edge(parent, i == gate ? "FantasyTownKit/fence-gate" : "FantasyTownKit/fence", c, outward, scale, false);
-            if (piece == null) continue;
-            var col = AddBoxCollider(piece);
-            float tall = 2.5f / piece.transform.lossyScale.y;   // too tall to hop over
-            col.center = new Vector3(col.center.x, tall * 0.5f, col.center.z);
-            col.size = new Vector3(col.size.x, tall, col.size.z);
+            Vector3 c = a + dir * (seg * (i + 0.5f));
+            var go = PlaceAsset(parent, fence, c, yaw + modelYaw, width: seg * 1.02f);
+            if (go == null) continue;
+            var col = go.AddComponent<BoxCollider>();
+            var lb = LocalBounds(go.transform);
+            float tall = 2.4f / go.transform.lossyScale.y;   // too tall to hop over
+            col.center = new Vector3(lb.center.x, tall * 0.5f, lb.center.z);
+            col.size = new Vector3(lb.size.x, tall, lb.size.z);
         }
     }
 
-    // Tall rocks on the hills around the yard.
-    static GameObject BuildFormations()
+    // ---- Around the yard ------------------------------------------------------------
+    // Big trees just past the fence and boulders on the meadow.
+    static GameObject BuildSurroundings()
     {
-        var f = new GameObject("Rock Formations");
-        var rocks = new (string m, float x, float z, float h)[]
+        var f = new GameObject("Rocks and Trees");
+        var cypress = AssetDatabase.LoadAssetAtPath<GameObject>(DemoPack + "/Prefabs/Trees/Cypress/Cypress_Forest_Desktop.prefab");
+        var conifer = AssetDatabase.LoadAssetAtPath<GameObject>(DemoPack + "/Prefabs/Trees/Conifer/Conifer.prefab");
+        var trees = new (GameObject prefab, float x, float z, float h)[]
         {
-            ("rock_tallA", -44f, 24f, 14f), ("rock_tallC", -38f, 31f, 9f), ("rock_tallE", -49f, 17f, 7f), ("stone_tallB", -51f, 31f, 11f),
-            ("rock_tallB", 49f, 22f, 16f), ("rock_tallD", 44f, 29f, 10f), ("rock_tallF", 54f, 16f, 7f), ("stone_tallD", 56f, 29f, 12f),
-            ("rock_tallG", 4f, 95f, 20f), ("rock_tallH", -8f, 98f, 13f), ("rock_tallI", 15f, 97f, 10f),
+            (cypress, -15.5f, -13f, 11f), (cypress, 20.5f, -12f, 12f), (cypress, -16f, 5f, 10f), (conifer, 22f, 6f, 17f),
+            (cypress, -14.5f, 13.5f, 11.5f), (conifer, -24f, -4f, 19f), (cypress, 12f, 14f, 10f), (cypress, 26f, -2f, 12.5f),
         };
         var rng = new System.Random(9);
+        foreach (var t in trees)
+        {
+            if (t.prefab == null) continue;
+            PlaceAsset(f.transform, t.prefab, OnGround(t.x, t.z, 0.1f), (float)rng.NextDouble() * 360f, height: t.h);
+        }
+
+        var rocks = new (string id, float x, float z, float h)[]
+        {
+            ("boulder_01", -20f, 16f, 1.4f), ("boulder_01", 24f, 15f, 1.1f), ("rock_moss_set_01", 19f, -18f, 0.9f),
+            ("boulder_01", -2f, 26f, 1.6f), ("rock_moss_set_01", 9f, 24f, 1.0f), ("shrub_02", -6f, 18f, 1.6f), ("shrub_02", 14f, 20f, 1.4f),
+        };
         foreach (var r in rocks)
-            Place(f.transform, "NatureKit/" + r.m, OnGround(r.x, r.z, 0.8f), (float)rng.NextDouble() * 360f, height: r.h);
+            Prop(f.transform, r.id, OnGround(r.x, r.z, 0.15f), (float)rng.NextDouble() * 360f, height: r.h);
         return f;
+    }
+
+    static GameObject Prop(Transform parent, string polyHavenId, Vector3 ground, float yaw, float height = 0f, float width = 0f, bool collider = false)
+    {
+        var asset = PolyHavenAsset(polyHavenId);
+        return asset == null ? null : PlaceAsset(parent, asset, ground, yaw, height, width, collider);
     }
 
     // ---- Placement helpers ---------------------------------------------------------
@@ -477,6 +447,20 @@ public static partial class DigInSceneBuilder
     {
         var go = InstantiateKit(kitModel, parent);
         if (go == null) return null;
+        return Fit(go, ground, yaw, height, width, collider);
+    }
+
+    static GameObject PlaceAsset(Transform parent, GameObject asset, Vector3 ground, float yaw,
+                                 float height = 0f, float width = 0f, bool collider = false)
+    {
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(asset, parent);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        return Fit(go, ground, yaw, height, width, collider);
+    }
+
+    static GameObject Fit(GameObject go, Vector3 ground, float yaw, float height, float width, bool collider)
+    {
         go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
         var b = WorldBounds(go);
         float s = height > 0f ? height / Mathf.Max(0.001f, b.size.y)

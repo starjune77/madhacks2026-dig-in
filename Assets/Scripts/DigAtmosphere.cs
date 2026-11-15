@@ -22,6 +22,8 @@ public class DigAtmosphere : MonoBehaviour
     public Color deepFog = new Color(0.16f, 0.10f, 0.06f);
     public float deepFogDensity = 0.06f;
     [Range(0f, 1f)] public float deepSunScale = 0.25f;
+    [Tooltip("Ambient and reflection intensity deep down (the sky lights the surface).")]
+    [Range(0f, 1f)] public float deepAmbient = 0.12f;
 
     [Header("Lantern")]
     public float lanternSurfaceIntensity = 0f;
@@ -29,7 +31,7 @@ public class DigAtmosphere : MonoBehaviour
     public float flicker = 0.08f;
 
     Color surfaceSky, surfaceEquator, surfaceGround, surfaceFog;
-    float surfaceFogDensity, surfaceSunIntensity;
+    float surfaceFogDensity, surfaceSunIntensity, surfaceAmbient, surfaceReflection;
 
     void Start()
     {
@@ -39,6 +41,8 @@ public class DigAtmosphere : MonoBehaviour
         surfaceFog = RenderSettings.fogColor;
         surfaceFogDensity = RenderSettings.fogDensity;
         if (sun != null) surfaceSunIntensity = sun.intensity;
+        surfaceAmbient = RenderSettings.ambientIntensity;
+        surfaceReflection = RenderSettings.reflectionIntensity;
     }
 
     void Update()
@@ -54,6 +58,8 @@ public class DigAtmosphere : MonoBehaviour
         RenderSettings.fogColor = Color.Lerp(surfaceFog, deepFog, t);
         RenderSettings.fogDensity = Mathf.Lerp(surfaceFogDensity, deepFogDensity, t);
         if (sun != null) sun.intensity = surfaceSunIntensity * Mathf.Lerp(1f, deepSunScale, t);
+        RenderSettings.ambientIntensity = surfaceAmbient * Mathf.Lerp(1f, deepAmbient, t);
+        RenderSettings.reflectionIntensity = surfaceReflection * Mathf.Lerp(1f, deepAmbient, t);
 
         if (lantern != null)
         {
@@ -73,5 +79,7 @@ public class DigAtmosphere : MonoBehaviour
         RenderSettings.ambientGroundColor = surfaceGround;
         RenderSettings.fogColor = surfaceFog;
         RenderSettings.fogDensity = surfaceFogDensity;
+        RenderSettings.ambientIntensity = surfaceAmbient;
+        RenderSettings.reflectionIntensity = surfaceReflection;
     }
 }
