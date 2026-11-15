@@ -40,8 +40,8 @@ The low-poly, straight-shaft version was play-tested and rejected: soil like shi
 
 Order, one commit per working step, Play mode screenshots checked after each:
 
-1. **Terrain** - chunked density field, marching cubes, Burst jobs, a collider per chunk. `[in progress]`
-2. **Digging feel** (top priority) - animation-clip swing with anticipation, impact, follow-through; ~40 ms hit-stop; soft camera kick; the scoop forms over a short tween and crumbles at its edges; physical clods and crumbs that pile up; dust puffs; hold-to-dig rhythm; a subtle preview of the next scoop; smooth movement. **Stop here for a developer play-test.** `[next]`
+1. **Terrain** - chunked density field, marching cubes, Burst jobs, a collider per chunk. `[done]`
+2. **Digging feel** (top priority) - animation-clip swing with anticipation, impact, follow-through; ~40 ms hit-stop; soft camera kick; the scoop forms over a short tween and crumbles at its edges; physical clods and crumbs that pile up; dust puffs; hold-to-dig rhythm; a subtle preview of the next scoop; smooth movement. **Stop here for a developer play-test.** `[in progress]`
 3. **Soil materials** - CC0 photoscanned PBR soil, clay and rock (Poly Haven / ambientCG, 2K), triplanar, fully matte, blended by stratum; dug surfaces darker and moister, with pebbles and roots.
 4. **Sky, light and mood** - Evening Field HDRI as visible sky and lighting, height fog, soft shadows, SSAO, soft bloom, depth of field, warm filmic grade, subtle grain and vignette, dust motes; cozy lantern underground.
 5. **Environment** - realistic house, fence, trees, grass, rocks (Poly Haven models, free Asset Store packs the developer imports). Remove every Kenney asset.

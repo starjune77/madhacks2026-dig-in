@@ -1,42 +1,52 @@
+using System;
 using UnityEngine;
 
-// The first-person shovel. Lives in the Player prefab under the camera, with one child
-// model per shovel level (assigned in `models`). DigPlayer drives the swing via Pose().
+// The first-person shovel. Lives in the Player prefab under the camera:
+//   Shovel (this, Animator)  - sways with walking and looking
+//     Pivot                  - moved by the swing clips (Assets/Animations)
+//       one model per shovel level, origin = grip, handle along +Z
+// The swing itself is animation: the clips call OnImpact, OnToss, OnReady and OnDone
+// here through animation events, and DigPlayer listens.
+[RequireComponent(typeof(Animator))]
 public class DigShovel : MonoBehaviour
 {
-    [Tooltip("One model per shovel level: Toy, Garden, Steel. Origin = grip, handle along +Z.")]
+    [Tooltip("One model per shovel level: Toy, Garden, Steel.")]
     public GameObject[] models;
+    [Tooltip("Tip of the blade: where tossed earth leaves the shovel.")]
+    public Transform blade;
 
-    [Header("Swing (camera space)")]
-    [Tooltip("Point in the swing (0..1) where the blade hits the ground.")]
-    [Range(0f, 1f)] public float impactT = 0.42f;
+    [Header("Impact")]
+    [Tooltip("Seconds the swing freezes when the blade bites.")]
+    public float hitStop = 0.04f;
 
-    // Key poses: rest -> raised -> strike -> dig in -> scoop -> rest.
-    // Rotation x = pitch (positive points the blade down). At rest the shovel sits low
-    // on the right with the blade tipped up, so its face shows and the centre stays clear.
-    public float[] keyTime = { 0f, 0.30f, 0.42f, 0.50f, 0.75f, 1f };
-    public Vector3[] keyPos =
-    {
-        new Vector3(0.40f, -0.46f, 0.40f),
-        new Vector3(0.36f, -0.38f, 0.36f),
-        new Vector3(0.22f, -0.30f, 0.55f),
-        new Vector3(0.21f, -0.32f, 0.59f),
-        new Vector3(0.30f, -0.36f, 0.48f),
-        new Vector3(0.40f, -0.46f, 0.40f),
-    };
-    public Vector3[] keyRot =
-    {
-        new Vector3(-30f, -20f, 8f),
-        new Vector3(-58f, -14f, 4f),
-        new Vector3(22f, -10f, 0f),
-        new Vector3(26f, -10f, 0f),
-        new Vector3(-18f, -12f, 12f),
-        new Vector3(-30f, -20f, 8f),
-    };
+    [Header("Sway")]
+    public float bobAmount = 0.014f;
+    [Tooltip("How far the shovel lags behind when you turn (degrees per degree/second).")]
+    public float lookLag = 0.012f;
+    public float maxLag = 4f;
+    public float idleSway = 0.004f;
 
-    void Start()
+    public event Action Impact;
+    public event Action Toss;
+
+    // False from the start of a swing until the clip says the next one may begin.
+    public bool Ready { get; private set; } = true;
+
+    static readonly int SwingState = Animator.StringToHash("Swing");
+    static readonly int BounceState = Animator.StringToHash("Bounce");
+
+    Animator animator;
+    Vector3 restPosition;
+    Quaternion restRotation;
+    Vector2 lag;
+    float stopTimer;
+    float busyTimer;
+
+    void Awake()
     {
-        Pose(-1f, 0f, 0f);
+        animator = GetComponent<Animator>();
+        restPosition = transform.localPosition;
+        restRotation = transform.localRotation;
     }
 
     public void SetLevel(int level)
@@ -45,28 +55,65 @@ public class DigShovel : MonoBehaviour
             if (models[i] != null) models[i].SetActive(i == level);
     }
 
-    // t: swing progress 0..1, or negative when idle. bob: walking sway.
-    public void Pose(float t, float bobPhase, float bobAmount)
+    public void Swing()
     {
-        Vector3 pos = keyPos[0];
-        Quaternion rot = Quaternion.Euler(keyRot[0]);
+        Ready = false;
+        busyTimer = 1.5f;
+        animator.speed = 1f;
+        stopTimer = 0f;
+        animator.CrossFadeInFixedTime(SwingState, 0.07f, 0, 0f);
+    }
 
-        if (t >= 0f)
+    // The blade bit into the ground: hold the pose for a moment.
+    public void HitStop()
+    {
+        stopTimer = hitStop;
+        animator.speed = 0f;
+    }
+
+    // The blade hit something it cannot dig: recoil.
+    public void Bounce()
+    {
+        animator.speed = 1f;
+        stopTimer = 0f;
+        animator.CrossFadeInFixedTime(BounceState, 0.03f, 0, 0f);
+    }
+
+    // ---- Animation events (see the Swing and Bounce clips) -----------------------------
+    void OnImpact() { Impact?.Invoke(); }
+    void OnToss() { Toss?.Invoke(); }
+    void OnReady() { Ready = true; }
+    void OnDone() { Ready = true; }
+
+    void Update()
+    {
+        if (stopTimer > 0f)
         {
-            t = Mathf.Clamp01(t);
-            int seg = 0;
-            while (seg < keyTime.Length - 2 && t > keyTime[seg + 1]) seg++;
-
-            float u = Mathf.InverseLerp(keyTime[seg], keyTime[seg + 1], t);
-            // The strike accelerates into the ground; everything else eases in and out.
-            u = seg == 1 ? u * u : Mathf.SmoothStep(0f, 1f, u);
-
-            pos = Vector3.Lerp(keyPos[seg], keyPos[seg + 1], u);
-            rot = Quaternion.Slerp(Quaternion.Euler(keyRot[seg]), Quaternion.Euler(keyRot[seg + 1]), u);
+            stopTimer -= Time.unscaledDeltaTime;
+            if (stopTimer <= 0f) animator.speed = 1f;
         }
 
-        pos += new Vector3(Mathf.Cos(bobPhase) * 0.012f, -Mathf.Abs(Mathf.Sin(bobPhase)) * 0.014f, 0f) * bobAmount;
-        transform.localPosition = pos;
-        transform.localRotation = rot;
+        // Never get stuck waiting for an event that did not come.
+        if (!Ready)
+        {
+            busyTimer -= Time.deltaTime;
+            if (busyTimer <= 0f) Ready = true;
+        }
+    }
+
+    // Walking bob, a slow idle drift, and a little lag behind the camera when turning.
+    public void Sway(float bobPhase, float walk, Vector2 lookDegreesPerSecond)
+    {
+        float dt = Time.deltaTime;
+        Vector2 target = Vector2.ClampMagnitude(-lookDegreesPerSecond * lookLag, maxLag);
+        lag = Vector2.Lerp(lag, target, 1f - Mathf.Exp(-10f * dt));
+
+        float t = Time.time;
+        Vector3 offset = new Vector3(Mathf.Cos(bobPhase) * bobAmount, -Mathf.Abs(Mathf.Sin(bobPhase)) * bobAmount * 1.2f, 0f) * walk;
+        offset += new Vector3(Mathf.Sin(t * 0.9f), Mathf.Sin(t * 1.3f + 1f), 0f) * idleSway;
+        offset += new Vector3(lag.x, -lag.y, 0f) * 0.004f;
+
+        transform.localPosition = restPosition + offset;
+        transform.localRotation = restRotation * Quaternion.Euler(lag.y, lag.x, lag.x * 0.5f);
     }
 }

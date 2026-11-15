@@ -38,20 +38,21 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v3 rest pose";
+    const string PlayerVersion = "v4 animated shovel";
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
     const string HudVersion = "v6 ending layout";
-    const string HubVersion = "v2 lean-to";      // marker child of scene/Surface Hub
+    const string HubVersion = "v3 spawn height";      // marker child of scene/Surface Hub
+    const string DigSiteVersion = "v3 volume";        // marker child of scene/Dig Site
+    const string EnvVersion = "v2 backyard";          // marker child of scene/Environment
     const string PageVersion = "v1 page";
 
     static readonly Color[] StrataColors =
     {
-        new Color(0.55f, 0.38f, 0.24f),   // dirt (Childhood)
-        new Color(0.70f, 0.42f, 0.28f),   // clay (School Days)
-        new Color(0.45f, 0.45f, 0.48f),   // stone (Growing Up)
-        new Color(0.92f, 0.90f, 0.84f),   // today (the very bottom)
+        new Color(0.36f, 0.25f, 0.16f),   // dirt (Childhood)
+        new Color(0.50f, 0.29f, 0.19f),   // clay (School Days)
+        new Color(0.34f, 0.33f, 0.34f),   // stone (Growing Up)
     };
 
     static readonly Color TextColor = new Color(1f, 0.95f, 0.86f, 1f);
@@ -69,7 +70,8 @@ public static partial class DigInSceneBuilder
         report = new StringBuilder("DigIn/Build Scene\n");
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
-        foreach (var dir in new[] { MatDir, TexDir, MeshDir, PrefabDir, MemoryDir, LetterDir, FontDir, TerrainDir }) EnsureFolder(dir);
+        foreach (var dir in new[] { MatDir, TexDir, MeshDir, PrefabDir, MemoryDir, LetterDir, FontDir, TerrainDir, AnimDir }) EnsureFolder(dir);
+        EnsureLayers();
 
         var m = BuildMaterials();
         var memories = BuildMemories();
@@ -79,16 +81,15 @@ public static partial class DigInSceneBuilder
             var page = ScriptableObject.CreateInstance<MemoryData>();
             page.title = "A Blank Page";
             page.line = "";
-            page.depth = 23.6f;
             page.stratum = 2;
             return page;
         });
         var font = BuildFont("Lora-Regular");
         var italic = BuildFont("Lora-Italic");
-        var wallMesh = LoadOrCreate(MeshDir + "/ShaftWalls.asset", DigTerrain.BuildWallMesh);
+        var feel = BuildFeelAssets();
 
         var rebuilt = new HashSet<string>();
-        var playerPrefab = BuildPlayerPrefab(m, rebuilt);
+        var playerPrefab = BuildPlayerPrefab(feel, rebuilt);
         var findPrefabs = new[]
         {
             BuildFindPrefab("Memory Find", "FurnitureKit/cardboardBoxClosed", 0.26f, rebuilt),      // Childhood: a toy box
@@ -105,12 +106,12 @@ public static partial class DigInSceneBuilder
         BuildMeshyFinds(memories);
         Migrate(scene, rebuilt);
 
-        BuildDigSite(scene, m, wallMesh);
         BuildEnvironment(scene);
+        BuildDigSite(scene, m, feel);
         BuildHub(scene, shelfPrefab, benchPrefab);
 
         var player = Root(scene, "Player", out bool newPlayer, playerPrefab);
-        if (newPlayer) player.position = new Vector3(3f, 1f, -8f);
+        if (newPlayer) player.position = SpawnPos;
         Root(scene, "HUD", out _, hudPrefab);
 
         // The template's camera is replaced by the one in the Player prefab.
@@ -151,18 +152,22 @@ public static partial class DigInSceneBuilder
         if (rebuilt.Contains("Player")) DestroyRoot(scene, "Player");
         if (rebuilt.Contains("HUD")) DestroyRoot(scene, "HUD");
         if (rebuilt.Contains("Shelf") || rebuilt.Contains("Bench")) DestroyRoot(scene, "Surface Hub");
+        DestroyOldRoot(scene, "Surface Hub", HubVersion);
+        DestroyOldRoot(scene, "Dig Site", DigSiteVersion);
 
-        var hub = FindRoot(scene, "Surface Hub");
-        if (hub != null && hub.Find(HubVersion) == null) DestroyRoot(scene, "Surface Hub");
-
-        // v1 had 40 m earth boxes around the shaft; they would cover the excavation.
-        var earth = FindRoot(scene, "Dig Site")?.Find("Shaft Earth");
-        var west = earth != null ? earth.Find("West") : null;
-        if (west != null && west.localScale.x > 10f)
+        // The terrain is an asset: an old one must go together with its scene object.
+        var env = FindRoot(scene, "Environment");
+        if (env != null && env.Find(EnvVersion) == null)
         {
-            Object.DestroyImmediate(earth.gameObject);
-            report.AppendLine("  removed v1 Shaft Earth");
+            DestroyRoot(scene, "Environment");
+            if (AssetDatabase.DeleteAsset(TerrainDir + "/Dig Site Terrain.asset")) report.AppendLine("  deleted the old terrain data");
         }
+    }
+
+    static void DestroyOldRoot(Scene scene, string name, string version)
+    {
+        var root = FindRoot(scene, name);
+        if (root != null && root.Find(version) == null) DestroyRoot(scene, name);
     }
 
     static void DeleteUnusedAssets()
@@ -171,7 +176,7 @@ public static partial class DigInSceneBuilder
         {
             "Placeholder Grass", "Placeholder Earth", "Placeholder Wood", "Placeholder Wood Dark", "Placeholder Card",
             "Placeholder Find", "Shovel Toy Handle", "Shovel Garden Handle", "Shovel Steel Handle",
-            "Shovel Toy Blade", "Shovel Garden Blade", "Shovel Steel Blade",
+            "Shovel Toy Blade", "Shovel Garden Blade", "Shovel Steel Blade", "Strata", "Shaft Earth",
         };
         foreach (var name in old)
         {
@@ -179,12 +184,14 @@ public static partial class DigInSceneBuilder
             if (AssetDatabase.LoadAssetAtPath<Material>(path) != null && AssetDatabase.DeleteAsset(path))
                 report.AppendLine("  deleted " + path);
         }
+        foreach (var path in new[] { MeshDir + "/ShaftWalls.asset", TexDir + "/Strata Gradient.png" })
+            if (File.Exists(path) && AssetDatabase.DeleteAsset(path)) report.AppendLine("  deleted " + path);
     }
 
     // ---- Assets --------------------------------------------------------------
     class Mats
     {
-        public Material strata, earth, paper, frame, sky;
+        public Material soil, paper, frame, sky;
         public Material[] clods;
     }
 
@@ -192,15 +199,25 @@ public static partial class DigInSceneBuilder
     {
         var m = new Mats();
 
-        var strataTex = BuildStrataTexture();
-        m.strata = Mat("Strata", Color.white, 0.05f, 0f, strataTex);
+        // The ground: Assets/Shaders/DigSoil.shader. Its colours are material properties.
+        m.soil = LoadOrCreate(MatDir + "/Dig Soil.mat", () =>
+        {
+            var soil = new Material(Shader.Find("DigIn/Soil"));
+            soil.SetColor("_GrassColor", new Color(0.47f, 0.54f, 0.28f));
+            soil.SetColor("_GrassDark", new Color(0.38f, 0.46f, 0.23f));
+            soil.SetColor("_DirtColor", StrataColors[0]);
+            soil.SetColor("_ClayColor", StrataColors[1]);
+            soil.SetColor("_StoneColor", StrataColors[2]);
+            return soil;
+        });
+
+        // Loose earth is as matte as the ground it came from.
         m.clods = new[]
         {
-            Mat("Clod Dirt", StrataColors[0] * 0.9f, 0.05f),
-            Mat("Clod Clay", StrataColors[1] * 0.9f, 0.05f),
-            Mat("Clod Stone", StrataColors[2] * 0.9f, 0.05f),
+            Matte(Mat("Clod Dirt", StrataColors[0] * 0.8f, 0f), StrataColors[0] * 0.8f),
+            Matte(Mat("Clod Clay", StrataColors[1] * 0.8f, 0f), StrataColors[1] * 0.8f),
+            Matte(Mat("Clod Stone", StrataColors[2] * 0.8f, 0f), StrataColors[2] * 0.8f),
         };
-        m.earth = Mat("Shaft Earth", new Color(0.36f, 0.26f, 0.18f), 0.05f);
         m.paper = Mat("Card Paper", new Color(0.96f, 0.92f, 0.83f), 0.1f);
         m.frame = Mat("Card Frame", new Color(0.33f, 0.22f, 0.14f), 0.35f);
 
@@ -219,40 +236,34 @@ public static partial class DigInSceneBuilder
         return m;
     }
 
-    static Texture2D BuildStrataTexture()
+    // No highlights, no reflections. Applied on every run, so older shiny versions are fixed too.
+    static Material Matte(Material mat, Color color)
     {
-        string path = TexDir + "/Strata Gradient.png";
-        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-        if (existing != null) { Skipped(path); return existing; }
-
-        var tex = DigTerrain.MakeStrataTexture(StrataColors);
-        File.WriteAllBytes(path, tex.EncodeToPNG());
-        Object.DestroyImmediate(tex);
-        AssetDatabase.ImportAsset(path);
-
-        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
-        importer.wrapMode = TextureWrapMode.Clamp;
-        importer.mipmapEnabled = true;
-        importer.anisoLevel = 8;
-        importer.textureCompression = TextureImporterCompression.Uncompressed;
-        importer.SaveAndReimport();
-        Created(path);
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        color.a = 1f;
+        mat.SetColor("_BaseColor", color);
+        mat.SetFloat("_Smoothness", 0f);
+        mat.SetFloat("_SpecularHighlights", 0f);
+        mat.SetFloat("_EnvironmentReflections", 0f);
+        mat.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+        mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+        EditorUtility.SetDirty(mat);
+        return mat;
     }
 
     static MemoryData[] BuildMemories()
     {
-        var defs = new (string title, string line, float depth)[]
+        // Third value: metres along the life path (strata begin at about 27 m and 57 m).
+        var defs = new (string title, string line, float distance)[]
         {
-            ("Bicycle Bell", "Someone was holding the back of the seat. I didn't notice when they let go.", 2.5f),
-            ("Crayon", "I drew a house with four windows. The real house only had two.", 5.0f),
-            ("Toy Car", "One wheel was missing, but I still raced it across the kitchen floor.", 7.2f),
-            ("Graded Test Paper", "I folded the paper before anyone could see the number at the top.", 10.5f),
-            ("Worn Eraser", "We kept borrowing this from each other, even though the teacher had a whole box.", 13.0f),
-            ("Folded Note", "It just said, 'Meet me after class.' I kept checking the clock.", 15.2f),
-            ("House Key", "I stood outside the door for a moment, holding the key to a place that was finally mine.", 18.5f),
-            ("Train Ticket", "I watched the platform disappear, even after there was nothing left to see.", 21.0f),
-            ("Coffee Mug", "I reheated the same cup twice. By evening, it was still sitting beside my work.", 23.2f),
+            ("Bicycle Bell", "Someone was holding the back of the seat. I didn't notice when they let go.", 7f),
+            ("Crayon", "I drew a house with four windows. The real house only had two.", 14f),
+            ("Toy Car", "One wheel was missing, but I still raced it across the kitchen floor.", 21f),
+            ("Graded Test Paper", "I folded the paper before anyone could see the number at the top.", 31f),
+            ("Worn Eraser", "We kept borrowing this from each other, even though the teacher had a whole box.", 40f),
+            ("Folded Note", "It just said, 'Meet me after class.' I kept checking the clock.", 49f),
+            ("House Key", "I stood outside the door for a moment, holding the key to a place that was finally mine.", 61f),
+            ("Train Ticket", "I watched the platform disappear, even after there was nothing left to see.", 68f),
+            ("Coffee Mug", "I reheated the same cup twice. By evening, it was still sitting beside my work.", 75f),
         };
 
         var result = new MemoryData[defs.Length];
@@ -265,10 +276,15 @@ public static partial class DigInSceneBuilder
                 var data = ScriptableObject.CreateInstance<MemoryData>();
                 data.title = d.title;
                 data.line = d.line;
-                data.depth = d.depth;
+                data.pathDistance = d.distance;
                 data.stratum = index / 3;
                 return data;
             });
+            if (result[i].pathDistance <= 0f)   // made before the life path existed
+            {
+                result[i].pathDistance = d.distance;
+                EditorUtility.SetDirty(result[i]);
+            }
         }
         return result;
     }
@@ -376,7 +392,7 @@ public static partial class DigInSceneBuilder
         new GameObject(version).transform.SetParent(root.transform, false);
     }
 
-    static GameObject BuildPlayerPrefab(Mats m, HashSet<string> rebuilt)
+    static GameObject BuildPlayerPrefab(Feel feel, HashSet<string> rebuilt)
     {
         string path = PrefabDir + "/Player.prefab";
         var current = CurrentPrefab(path, PlayerVersion, "Player", rebuilt);
@@ -384,11 +400,13 @@ public static partial class DigInSceneBuilder
 
         var root = new GameObject("Player");
         AddMarker(root, PlayerVersion);
+        // A little shorter than standing height: the tunnels you dig are your own size.
         var cc = root.AddComponent<CharacterController>();
-        cc.height = 1.8f;
-        cc.radius = 0.35f;
+        cc.height = 1.4f;
+        cc.radius = 0.3f;
         cc.stepOffset = 0.3f;
-        cc.slopeLimit = 50f;
+        cc.slopeLimit = 72f;     // DigPlayer slows the climb well before this; beyond it you slide
+        cc.skinWidth = 0.04f;
         var player = root.AddComponent<DigPlayer>();
 
         var camGo = new GameObject("Camera");
@@ -413,27 +431,44 @@ public static partial class DigInSceneBuilder
         lantern.intensity = 0f;
         lantern.shadows = LightShadows.None;
 
+        // Shovel (sways) / Pivot (moved by the swing clips) / one model per level.
         var shovelGo = new GameObject("Shovel");
         shovelGo.transform.SetParent(camGo.transform, false);
+        var animator = shovelGo.AddComponent<Animator>();
+        animator.runtimeAnimatorController = feel.shovelController;
+        animator.applyRootMotion = false;
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         var shovel = shovelGo.AddComponent<DigShovel>();
 
-        // One Kenney shovel per level, told apart by size and tint.
+        var pivot = new GameObject("Pivot").transform;
+        pivot.SetParent(shovelGo.transform, false);
+        pivot.localPosition = ShovelRestPos;
+        pivot.localRotation = Quaternion.Euler(ShovelRestRot);
+
+        // One Kenney shovel per level, told apart by size and tint (stand-ins until the real shovel).
         var baseMat = KitMaterial("SurvivalKit/tool-shovel");
         var toyMat = TintedMaterial("Shovel Toy", baseMat, new Color(1f, 0.62f, 0.38f), 0.45f, 0f);
         var steelMat = TintedMaterial("Shovel Steel", KitMaterial("SurvivalKit/tool-shovel-upgraded"), new Color(0.86f, 0.9f, 1f), 0.6f, 0.35f);
         shovel.models = new[]
         {
-            ShovelModel("Toy Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.46f, toyMat),
-            ShovelModel("Garden Shovel", shovelGo.transform, "SurvivalKit/tool-shovel", 0.54f, null),
-            ShovelModel("Steel Shovel", shovelGo.transform, "SurvivalKit/tool-shovel-upgraded", 0.62f, steelMat),
+            ShovelModel("Toy Shovel", pivot, "SurvivalKit/tool-shovel", 0.46f, toyMat),
+            ShovelModel("Garden Shovel", pivot, "SurvivalKit/tool-shovel", 0.54f, null),
+            ShovelModel("Steel Shovel", pivot, "SurvivalKit/tool-shovel-upgraded", 0.62f, steelMat),
         };
         shovel.models[1].SetActive(false);
         shovel.models[2].SetActive(false);
-        shovelGo.transform.localPosition = shovel.keyPos[0];
-        shovelGo.transform.localRotation = Quaternion.Euler(shovel.keyRot[0]);
+
+        var blade = new GameObject("Blade").transform;
+        blade.SetParent(pivot, false);
+        blade.localPosition = new Vector3(0f, 0.04f, 0.5f);
+        shovel.blade = blade;
 
         player.cam = camGo.transform;
         player.shovel = shovel;
+
+        int layer = LayerMask.NameToLayer("Player");
+        if (layer >= 0)
+            foreach (var t in root.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
         return SavePrefab(root, path);
     }
 
@@ -913,57 +948,48 @@ public static partial class DigInSceneBuilder
     }
 
     // ---- Scene: shaft and hub -------------------------------------------------
-    static void BuildDigSite(Scene scene, Mats m, Mesh wallMesh)
+    // The hidden life path: control points from the hollow in the yard down to "today".
+    // It winds under the yard, steep in places and nearly level in others (about 80 m).
+    static readonly Vector3[] LifePath =
     {
-        float s = DigTerrain.Size;
-        var digSite = Root(scene, "Dig Site", out _);
+        new Vector3(2.5f, -0.3f, 2.5f), new Vector3(4.5f, -3.3f, 4f), new Vector3(9f, -5f, 5.5f),
+        new Vector3(13f, -5.8f, 9f), new Vector3(14f, -8.5f, 12.5f), new Vector3(10.5f, -9.6f, 15.5f),
+        new Vector3(6.5f, -11.2f, 14.5f),                                   // School Days begins about here
+        new Vector3(2f, -11.6f, 12f), new Vector3(-0.5f, -14.8f, 10f), new Vector3(-5f, -16f, 10.5f),
+        new Vector3(-9.5f, -18.4f, 7.5f), new Vector3(-12f, -18.9f, 3.5f), new Vector3(-11.5f, -21.8f, 0.5f),   // Growing Up
+        new Vector3(-8.5f, -22.7f, -3.5f), new Vector3(-5.5f, -25.8f, -5.5f), new Vector3(-0.5f, -27.3f, -7f),
+        new Vector3(3.5f, -29.5f, -6f), new Vector3(6f, -31.5f, -3.5f),     // today
+    };
 
-        Ensure(digSite, "Shaft Floor", () =>
-        {
-            var floor = new GameObject("Shaft Floor", typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider));
-            floor.GetComponent<MeshRenderer>().sharedMaterial = m.strata;
-            floor.AddComponent<DigTerrain>();
-            return floor;
-        });
+    static void BuildDigSite(Scene scene, Mats m, Feel feel)
+    {
+        var digSite = Root(scene, "Dig Site", out bool created);
+        if (!created) return;
+        new GameObject(DigSiteVersion).transform.SetParent(digSite, false);
 
-        Ensure(digSite, "Shaft Walls", () =>
-        {
-            var walls = new GameObject("Shaft Walls", typeof(MeshFilter), typeof(MeshRenderer));
-            walls.GetComponent<MeshFilter>().sharedMesh = wallMesh;
-            var wr = walls.GetComponent<MeshRenderer>();
-            wr.sharedMaterial = m.strata;
-            wr.shadowCastingMode = ShadowCastingMode.Off;
-            return walls;
-        });
+        var pathGo = new GameObject("Life Path");
+        pathGo.transform.SetParent(digSite, false);
+        var path = pathGo.AddComponent<DigPath>();
+        path.points = (Vector3[])LifePath.Clone();
 
-        // Colliders and shadow casters only: the visible walls are "Shaft Walls".
-        Ensure(digSite, "Shaft Earth", () =>
-        {
-            var earth = new GameObject("Shaft Earth");
-            const float t = 2f, h = DigGame.TotalDepth + 2f;
-            EarthBox("West", earth.transform, new Vector3(-t / 2f, -h / 2f, s / 2f), new Vector3(t, h, s + 2f * t), m.earth);
-            EarthBox("East", earth.transform, new Vector3(s + t / 2f, -h / 2f, s / 2f), new Vector3(t, h, s + 2f * t), m.earth);
-            EarthBox("South", earth.transform, new Vector3(s / 2f, -h / 2f, -t / 2f), new Vector3(s, h, t), m.earth);
-            EarthBox("North", earth.transform, new Vector3(s / 2f, -h / 2f, s + t / 2f), new Vector3(s, h, t), m.earth);
-            return earth;
-        });
+        var volumeGo = new GameObject("Volume");
+        volumeGo.transform.SetParent(digSite, false);
+        var volume = volumeGo.AddComponent<DigVolume>();
+        volume.material = m.soil;
+        volume.surface = Find<Terrain>(scene);
+        volume.path = path;
+        volume.patchCentre = new Vector2(LifePath[0].x, LifePath[0].z);
 
-        Ensure(digSite, "Safety Floor", () =>
-        {
-            var bottom = new GameObject("Safety Floor").AddComponent<BoxCollider>();
-            bottom.transform.position = new Vector3(s / 2f, -DigGame.TotalDepth - 0.6f, s / 2f);
-            bottom.size = new Vector3(s, 1f, s);
-            return bottom.gameObject;
-        });
+        var debrisGo = BuildDebris(m, feel);
+        debrisGo.transform.SetParent(digSite, false);
 
-        Ensure(digSite, "Debris", () =>
-        {
-            var debris = new GameObject("Debris").AddComponent<DigDebris>();
-            debris.terrain = digSite.Find("Shaft Floor").GetComponent<DigTerrain>();
-            debris.clodMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
-            debris.materials = m.clods;
-            return debris.gameObject;
-        });
+        var scoopGo = new GameObject("Scoops");
+        scoopGo.transform.SetParent(digSite, false);
+        var scoops = scoopGo.AddComponent<DigScoop>();
+        scoops.volume = volume;
+        scoops.debris = debrisGo.GetComponent<DigDebris>();
+
+        BuildAimRing(feel).transform.SetParent(digSite, false);
     }
 
     // The yard in front of the house's back door: spawn, memory shelf, workbench lean-to.
@@ -975,12 +1001,12 @@ public static partial class DigInSceneBuilder
 
         var spawn = new GameObject("Spawn Point").transform;
         spawn.SetParent(hub, false);
-        spawn.position = new Vector3(3f, 1f, -8f);
+        spawn.position = SpawnPos;
 
         // Where the ending leaves you: looking at the shelf by the back door.
         var endView = new GameObject("Ending View").transform;
         endView.SetParent(hub, false);
-        endView.position = new Vector3(ShelfPos.x, 1f, ShelfPos.z + 3.6f);
+        endView.position = new Vector3(ShelfPos.x, SpawnPos.y, ShelfPos.z + 3.6f);
         endView.rotation = Quaternion.Euler(0f, 180f, 0f);
 
         Instance(shelfPrefab, hub, ShelfPos, 0f);
@@ -1007,8 +1033,11 @@ public static partial class DigInSceneBuilder
         if (story == null) story = gameRoot.gameObject.AddComponent<DigStory>();
 
         var player = Find<DigPlayer>(scene);
-        if (game.terrain == null) game.terrain = Find<DigTerrain>(scene);
+        if (game.volume == null) game.volume = Find<DigVolume>(scene);
+        if (game.path == null) game.path = Find<DigPath>(scene);
+        if (game.scoops == null) game.scoops = Find<DigScoop>(scene);
         if (game.debris == null) game.debris = Find<DigDebris>(scene);
+        if (game.aim == null) game.aim = Find<DigAim>(scene);
         if (game.player == null) game.player = player;
         if (game.shovel == null && player != null) game.shovel = player.shovel;
         if (game.hud == null) game.hud = Find<DigHud>(scene);

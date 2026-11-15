@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MemoryData
   title: Worn Eraser
   line: We kept borrowing this from each other, even though the teacher had a whole box.
-  depth: 13
+  pathDistance: 40
   stratum: 1
   card: {fileID: 0}
+  findPrefab: {fileID: 0}

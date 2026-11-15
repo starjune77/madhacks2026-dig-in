@@ -3,9 +3,9 @@ using UnityEngine.InputSystem;
 
 // Demo mode for judging. F12 toggles it; while it is on:
 //   F1  surface, Toy Shovel (start of Childhood)
-//   F2  8 m down, Garden Shovel (start of School Days)
-//   F3  16 m down, Steel Shovel (start of Growing Up)
-//   F4  the bottom, next to the blank page (the ending)
+//   F2  start of School Days on the life path, Garden Shovel
+//   F3  start of Growing Up on the life path, Steel Shovel
+//   F4  the end of the path, next to the blank page (the ending)
 // Sits on "Game" next to DigGame.
 public class DigDemo : MonoBehaviour
 {

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MemoryData
   title: Toy Car
   line: One wheel was missing, but I still raced it across the kitchen floor.
-  depth: 7.2
+  pathDistance: 21
   stratum: 0
   card: {fileID: 0}
+  findPrefab: {fileID: 0}

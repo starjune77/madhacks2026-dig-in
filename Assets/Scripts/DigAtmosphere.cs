@@ -11,7 +11,7 @@ public class DigAtmosphere : MonoBehaviour
 
     [Header("Depth curve")]
     [Tooltip("Depth (m) at which the deep look is fully reached.")]
-    public float fullDepth = 10f;
+    public float fullDepth = 6f;
     [Tooltip("Shape of the transition from surface (0) to deep (1) over depth 0..fullDepth.")]
     public AnimationCurve blend = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 

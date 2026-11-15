@@ -23,6 +23,8 @@ public static partial class DigInSceneBuilder
     // ---- Layout ----------------------------------------------------------------
     static readonly Vector3 ShelfPos = new Vector3(0.8f, 0f, -15.35f);
     static readonly Vector3 BenchPos = new Vector3(12.3f, 0f, -7f);
+    static readonly Vector3 SpawnPos = new Vector3(3f, 0.8f, -8f);
+    static readonly Vector2 DigStart = new Vector2(2.5f, 2.5f);      // the hollow where the dig begins
 
     const float YardMinX = -12f, YardMaxX = 17f, YardMinZ = -16f, YardMaxZ = 10f;
     const float HouseTile = 3.2f;          // one Fantasy Town tile, scaled up
@@ -30,14 +32,8 @@ public static partial class DigInSceneBuilder
     const int HouseTiles = 4;
     const int DoorTile = 2;
 
-    // Excavation: an ellipse of terraces north of the yard.
-    const float PitCx = 2.5f, PitCz = 50f, PitRx = 48f, PitRz = 36f;
-    const float TerracePeriod = 7f, TerraceFace = 2.5f, StepDepth = 3f;
-    const int TerraceLevels = 4;
-    const float RampX = 21f;
-
-    // Terrain: 256 m square, 0.5 m height cells aligned so the shaft (0..5 m) is exactly
-    // ten cells, which become a hole.
+    // Terrain: 256 m square, 0.5 m height cells. It has a hole exactly over the dig volume
+    // (DigVolume), which draws and collides the ground there instead.
     const float TerrainSize = 256f, TerrainBaseY = -14f, TerrainHeight = 52f;
     static readonly Vector3 TerrainOrigin = new Vector3(-126f, TerrainBaseY, -126f);
     const int HeightRes = 513, SplatRes = 1024;
@@ -50,34 +46,16 @@ public static partial class DigInSceneBuilder
             return;
         }
 
-        var env = Root(scene, "Environment", out _);
+        var env = Root(scene, "Environment", out bool created);
+        if (created) new GameObject(EnvVersion).transform.SetParent(env, false);
         Ensure(env, "Terrain", BuildTerrain);
         Ensure(env, "House", BuildHouse);
         Ensure(env, "Yard", BuildYard);
-        Ensure(env, "Shaft Rim", BuildRim);
-        Ensure(env, "Excavation", BuildExcavation);
         Ensure(env, "Rock Formations", BuildFormations);
     }
 
     // ---- Height function (shared by terrain and prop placement) --------------------
     static float Smooth(float a, float b, float v) => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, v));
-
-    // Metres inside the excavation rim (negative outside).
-    static float PitInside(float x, float z)
-    {
-        float nx = (x - PitCx) / PitRx, nz = (z - PitCz) / PitRz;
-        float r = Mathf.Sqrt(nx * nx + nz * nz);
-        float wobble = (Mathf.PerlinNoise(x * 0.05f + 3.1f, z * 0.05f + 7.3f) - 0.5f) * 0.08f;
-        return (1f - r + wobble) * PitRz;
-    }
-
-    static float Terraces(float inside)
-    {
-        int k = Mathf.FloorToInt(inside / TerracePeriod);
-        if (k >= TerraceLevels) return -StepDepth * TerraceLevels;
-        float t = inside - k * TerracePeriod;
-        return -StepDepth * (k + Smooth(0f, TerraceFace, t));
-    }
 
     static float RectDistance(float x, float z, float minX, float maxX, float minZ, float maxZ)
     {
@@ -88,20 +66,15 @@ public static partial class DigInSceneBuilder
 
     static float GroundHeight(float x, float z)
     {
-        // The yard (and house) is perfectly flat at 0; mounds grow away from it.
+        // The yard (and house) is flat at 0; mounds grow away from it, hills ring everything.
         float dYard = RectDistance(x, z, YardMinX - 2f, YardMaxX + 2f, YardMinZ - 5f, YardMaxZ + 1.5f);
         float mound = (Mathf.PerlinNoise(x * 0.035f + 20f, z * 0.035f + 40f) - 0.45f) * 5f * Smooth(2f, 22f, dYard);
         float r = Vector2.Distance(new Vector2(x, z), new Vector2(2.5f, 10f));
         float hills = Smooth(55f, 115f, r) * (14f + 18f * Mathf.PerlinNoise(x * 0.013f + 11f, z * 0.013f + 5f));
 
-        float inside = PitInside(x, z);
-        if (inside <= 0f) return (mound + hills) * Smooth(0f, 12f, -inside);
-
-        float depth = Terraces(inside);
-        float ramp = 1f - Smooth(2.5f, 4.5f, Mathf.Abs(x - RampX));
-        if (ramp > 0f)
-            depth = Mathf.Lerp(depth, -StepDepth * TerraceLevels * Mathf.Clamp01(inside / (TerracePeriod * TerraceLevels)), ramp);
-        return depth;
+        // The slight hollow in the grass where the dig begins.
+        float hollow = 0.32f * (1f - Smooth(0.3f, 2.4f, Vector2.Distance(new Vector2(x, z), DigStart)));
+        return mound + hills - hollow;
     }
 
     static float Slope(float x, float z)
@@ -205,68 +178,28 @@ public static partial class DigInSceneBuilder
         }
         data.SetHeights(0, 0, h);
 
-        // The shaft opening: cells covering x, z in [0, 5].
-        int start = Mathf.RoundToInt(-TerrainOrigin.x / cell);
-        int count = Mathf.RoundToInt(DigTerrain.Size / cell);
-        data.SetHoles(start, start, new bool[count, count]);   // false = hole
+        // A hole over the dig volume, which takes over there.
+        int startX = Mathf.RoundToInt((DigVolume.Min.x - TerrainOrigin.x) / cell);
+        int startZ = Mathf.RoundToInt((DigVolume.Min.z - TerrainOrigin.z) / cell);
+        int countX = Mathf.RoundToInt(DigVolume.Size.x / cell), countZ = Mathf.RoundToInt(DigVolume.Size.z / cell);
+        data.SetHoles(startX, startZ, new bool[countZ, countX]);   // false = hole
     }
 
-    // Layers: 0 grass, 1 dirt, 2 clay, 3 stone.
+    // Layers: 0 grass, 1 dirt, 2 clay, 3 stone. Grass, with rock showing on steep hillsides.
     static void FillSplat(TerrainData data)
     {
         float cell = TerrainSize / SplatRes;
         var a = new float[SplatRes, SplatRes, 4];
-        Vector2 door = new Vector2(HouseMinX + HouseTile * (DoorTile + 0.5f), YardMinZ + 0.3f);
-        Vector2 shaft = new Vector2(2.5f, -1.2f);
-
         for (int iz = 0; iz < SplatRes; iz++)
         for (int ix = 0; ix < SplatRes; ix++)
         {
             float x = TerrainOrigin.x + (ix + 0.5f) * cell, z = TerrainOrigin.z + (iz + 0.5f) * cell;
-            float inside = PitInside(x, z);
-            float slope = Slope(x, z);
-            var w = new float[4];
-
-            if (inside > -1.5f)
-            {
-                if (slope > 24f && inside > 0f)
-                {
-                    // A terrace face: dirt over clay over stone, deeper faces stonier.
-                    float depth = -GroundHeight(x, z);
-                    int k = Mathf.FloorToInt(depth / StepDepth);
-                    float local = depth / StepDepth - k;
-                    int band = Mathf.Clamp(Mathf.FloorToInt(local * 3f) + (k >= 2 ? 1 : 0), 0, 2);
-                    w[1 + band] = 1f;
-                }
-                else
-                {
-                    w[1] = 1f;
-                    if (inside < 0f) w[0] = Smooth(0f, -1.5f, inside);   // grass creeping to the rim
-                }
-            }
-            else
-            {
-                w[0] = 1f;
-                if (slope > 30f) { w[3] = Smooth(30f, 42f, slope); w[1] = 0.4f * w[3]; }
-            }
-
-            // A worn path from the back door to the shaft, and trampled earth around the shaft.
-            float path = DistToSegment(new Vector2(x, z), door, shaft);
-            float trample = RectDistance(x, z, -1f, 6f, -1f, 6f);
-            float bare = Mathf.Max(1f - Smooth(0.5f, 1.1f, path), 0.8f * (1f - Smooth(0.3f, 1.8f, trample)));
-            if (bare > 0f) { for (int l = 0; l < 4; l++) w[l] *= 1f - bare; w[1] += bare; }
-
-            float sum = w[0] + w[1] + w[2] + w[3];
-            for (int l = 0; l < 4; l++) a[iz, ix, l] = w[l] / sum;
+            float rock = Smooth(30f, 42f, Slope(x, z));
+            a[iz, ix, 0] = 1f - rock;
+            a[iz, ix, 1] = rock * 0.3f;
+            a[iz, ix, 3] = rock * 0.7f;
         }
         data.SetAlphamaps(0, 0, a);
-    }
-
-    static float DistToSegment(Vector2 p, Vector2 a, Vector2 b)
-    {
-        Vector2 ab = b - a;
-        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
-        return Vector2.Distance(p, a + ab * t);
     }
 
     // Pines on the surrounding hills, kept away from the yard and the excavation.
@@ -297,7 +230,9 @@ public static partial class DigInSceneBuilder
             float px = x + (float)(rng.NextDouble() - 0.5) * 3.5f;
             float pz = z + (float)(rng.NextDouble() - 0.5) * 3.5f;
             float r = Vector2.Distance(new Vector2(px, pz), new Vector2(2.5f, 10f));
-            if (r < 34f || PitInside(px, pz) > -4f) continue;
+            if (r < 34f) continue;
+            if (px > DigVolume.Min.x - 1f && px < DigVolume.Min.x + DigVolume.Size.x + 1f &&
+                pz > DigVolume.Min.z - 1f && pz < DigVolume.Min.z + DigVolume.Size.z + 1f) continue;   // the dig volume's ground
             if (RectDistance(px, pz, YardMinX, YardMaxX, YardMinZ - 4f, YardMaxZ) < 8f) continue;
             if (Slope(px, pz) > 34f) continue;
 
@@ -402,7 +337,7 @@ public static partial class DigInSceneBuilder
         {
             float x = Mathf.Lerp(YardMinX + 0.8f, YardMaxX - 0.8f, (float)rng.NextDouble());
             float z = Mathf.Lerp(YardMinZ + 1.5f, YardMaxZ - 0.8f, (float)rng.NextDouble());
-            if (RectDistance(x, z, -1.5f, 6.5f, -1.5f, 6.5f) < 1f) continue;
+            if (Vector2.Distance(new Vector2(x, z), DigStart) < 5.2f) continue;   // the bare patch
             if (Mathf.Abs(x - 3f) < 1.6f && z < 0f) continue;
             if (Vector2.Distance(new Vector2(x, z), new Vector2(BenchPos.x, BenchPos.z)) < 2.5f) continue;
             Place(t, rng.NextDouble() < 0.5 ? "NatureKit/grass_large" : "NatureKit/grass", new Vector3(x, 0f, z),
@@ -445,68 +380,7 @@ public static partial class DigInSceneBuilder
         }
     }
 
-    // ---- Shaft rim ----------------------------------------------------------------
-    static GameObject BuildRim()
-    {
-        var rim = new GameObject("Shaft Rim");
-        float s = DigTerrain.Size;
-        for (int x = -1; x <= (int)s; x++)
-        for (int z = -1; z <= (int)s; z++)
-        {
-            bool inside = x >= 0 && x < s && z >= 0 && z < s;
-            if (inside) continue;
-            Place(rim.transform, "FantasyTownKit/planks", new Vector3(x + 0.5f, 0f, z + 0.5f), ((x + z) & 1) * 90f, width: 1.0f, collider: true);
-        }
-        foreach (var corner in new[] { new Vector2(-0.6f, -0.6f), new Vector2(s + 0.6f, -0.6f), new Vector2(-0.6f, s + 0.6f), new Vector2(s + 0.6f, s + 0.6f) })
-            Place(rim.transform, "FantasyTownKit/pillar-wood", new Vector3(corner.x, 0.04f, corner.y), 0f, height: 1.0f, collider: true);
-        return rim;
-    }
-
-    // ---- Excavation ----------------------------------------------------------------
-    static GameObject BuildExcavation()
-    {
-        var ex = new GameObject("Excavation");
-        var t = ex.transform;
-
-        // A small camp on the floor.
-        Place(t, "SurvivalKit/tent", OnGround(-5f, 52f), 20f, height: 2.0f);
-        Place(t, "SurvivalKit/tent", OnGround(1.5f, 56f), -15f, height: 2.0f);
-        Place(t, "SurvivalKit/campfire-pit", OnGround(-1.5f, 51.5f), 0f, height: 0.45f);
-        Place(t, "NatureKit/log", OnGround(-3.2f, 50.2f), 70f, height: 0.4f);
-        Lantern(t, OnGround(3f, 49f), 2.2f);
-
-        // Supplies.
-        Place(t, "SurvivalKit/barrel", OnGround(12f, 44f), 0f, height: 1.0f);
-        Place(t, "SurvivalKit/barrel", OnGround(13.1f, 45f), 40f, height: 1.0f);
-        Place(t, "SurvivalKit/box-large", OnGround(11f, 45.6f), 10f, height: 1.0f);
-        Place(t, "SurvivalKit/box", OnGround(13.6f, 43f), -25f, height: 0.6f);
-        Place(t, "FantasyTownKit/cart", OnGround(RampX, 30f), 0f, height: 1.8f);
-        Place(t, "SurvivalKit/resource-planks", OnGround(-15f, 37f), 30f, width: 2.4f);
-        Place(t, "SurvivalKit/resource-wood", OnGround(-17f, 38.5f), 0f, height: 0.8f);
-        Place(t, "SurvivalKit/bucket", OnGround(-13.5f, 36.5f), 0f, height: 0.45f);
-        Place(t, "SurvivalKit/tool-pickaxe", OnGround(-12.6f, 37.2f), 30f, height: 0.7f);
-        Place(t, "SurvivalKit/workbench-grind", OnGround(-8f, 60f), 160f, height: 1.0f);
-        Place(t, "SurvivalKit/resource-stone-large", OnGround(8f, 60f), 0f, height: 1.2f);
-        Place(t, "SurvivalKit/resource-stone", OnGround(9.5f, 61f), 0f, height: 0.6f);
-
-        Lantern(t, OnGround(-14f, 33f), 2.2f);
-        Lantern(t, OnGround(14f, 33f), 2.2f);
-        Lantern(t, OnGround(RampX - 2f, 15.5f), 2.2f);
-
-        // Boulders on the terraces.
-        var boulders = new (string m, float x, float z, float h)[]
-        {
-            ("rock_largeA", -26f, 30f, 1.6f), ("rock_largeB", 28f, 33f, 2.2f), ("rock_largeC", -10f, 66f, 1.8f),
-            ("rock_largeD", 17f, 66f, 2.0f), ("rock_largeE", 33f, 50f, 2.4f), ("rock_largeF", -33f, 50f, 2.0f),
-            ("stone_largeA", 6f, 24f, 1.2f), ("stone_largeC", -20f, 58f, 1.5f),
-        };
-        var rng = new System.Random(5);
-        foreach (var b in boulders)
-            Place(t, "NatureKit/" + b.m, OnGround(b.x, b.z, 0.2f), (float)rng.NextDouble() * 360f, height: b.h);
-        return ex;
-    }
-
-    // Tall rocks either side of the excavation and on the far rim, framing the view north.
+    // Tall rocks on the hills around the yard.
     static GameObject BuildFormations()
     {
         var f = new GameObject("Rock Formations");
