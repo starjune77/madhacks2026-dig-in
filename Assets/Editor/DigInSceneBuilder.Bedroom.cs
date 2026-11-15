@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 // DigStory switches to it after the blank page.
 public static partial class DigInSceneBuilder
 {
-    const string BedroomVersion = "v2 morning";
+    const string BedroomVersion = "v3 curtains";
     static readonly Vector3 BedroomPos = new Vector3(420f, 0f, 420f);
     // Which end of the Meshy bed has the pillow, along its long axis (+1 or -1).
     const float PillowEnd = 1f;
@@ -43,6 +43,7 @@ public static partial class DigInSceneBuilder
         Box(room, "Wall Window Right", new Vector3((w + ww) / 4f, h / 2f, z), new Vector3((w - ww) / 2f, h, t), plaster);
         Box(room, "Wall Under Window", new Vector3(0f, sill / 2f, z), new Vector3(ww, sill, t), plaster);
         Box(room, "Wall Over Window", new Vector3(0f, (sill + wh + h) / 2f, z), new Vector3(ww, h - sill - wh, t), plaster);
+        BuildWindow(room, ww, wh, sill, z - t / 2f);
 
         // The bed against the left wall, its head at the back; the cat asleep on it.
         var bedAsset = MeshyAsset("Bed", 0.1f);
@@ -116,6 +117,85 @@ public static partial class DigInSceneBuilder
         fill.intensity = 0.7f;
         fill.color = new Color(1f, 0.9f, 0.78f);
         fill.shadows = LightShadows.None;
+    }
+
+    // A painted wooden window in the opening (frame, sill, glazing bars that throw a soft
+    // cross of shadow into the room) and two cream curtains drawn back to the sides on a
+    // rod. `inner` is the room-side face of the window wall (local z). Poly Haven textures.
+    static void BuildWindow(Transform room, float ww, float wh, float sill, float inner)
+    {
+        var frame = LoadOrCreate(ModelMatDir + "/Window Frame.mat", () => ScanMaterial("weathered_planks", new Vector2(0.3f, 0.3f), new Color(0.98f, 0.95f, 0.88f)));
+        var cloth = LoadOrCreate(ModelMatDir + "/Curtain.mat", () => ScanMaterial("terlenka", new Vector2(1.5f, 3f), new Color(1f, 0.95f, 0.86f)));
+        var rodMat = LoadOrCreate(ModelMatDir + "/Curtain Rod.mat", () =>
+        {
+            var m = new Material(LitShader);
+            m.SetColor("_BaseColor", new Color(0.30f, 0.21f, 0.14f));
+            m.SetFloat("_Smoothness", 0.45f);
+            return m;
+        });
+
+        var win = new GameObject("Window").transform;
+        win.SetParent(room, false);
+        float top = sill + wh, mid = inner + 0.05f;   // the sash sits in the middle of the wall
+        const float cw = 0.08f, cd = 0.025f;          // casing width and depth
+        // Casing around the opening on the room side, and a deeper sill.
+        Box(win, "Casing Left", new Vector3(-(ww + cw) / 2f, sill + wh / 2f, inner - cd / 2f), new Vector3(cw, wh + cw, cd), frame);
+        Box(win, "Casing Right", new Vector3((ww + cw) / 2f, sill + wh / 2f, inner - cd / 2f), new Vector3(cw, wh + cw, cd), frame);
+        Box(win, "Casing Top", new Vector3(0f, top + cw / 2f, inner - cd / 2f), new Vector3(ww + cw * 2f, cw, cd), frame);
+        Box(win, "Sill", new Vector3(0f, sill - 0.02f, inner - 0.06f), new Vector3(ww + 0.22f, 0.04f, 0.2f), frame);
+        // The sash: a frame and a cross of glazing bars.
+        const float sw = 0.055f, sd = 0.045f;
+        Box(win, "Sash Left", new Vector3(-(ww - sw) / 2f, sill + wh / 2f, mid), new Vector3(sw, wh, sd), frame);
+        Box(win, "Sash Right", new Vector3((ww - sw) / 2f, sill + wh / 2f, mid), new Vector3(sw, wh, sd), frame);
+        Box(win, "Sash Top", new Vector3(0f, top - sw / 2f, mid), new Vector3(ww, sw, sd), frame);
+        Box(win, "Sash Bottom", new Vector3(0f, sill + sw / 2f, mid), new Vector3(ww, sw, sd), frame);
+        Box(win, "Bar Upright", new Vector3(0f, sill + wh / 2f, mid), new Vector3(0.035f, wh, 0.03f), frame);
+        Box(win, "Bar Across", new Vector3(0f, sill + wh * 0.55f, mid), new Vector3(ww, 0.035f, 0.03f), frame);
+
+        // The rod, a little above and wider than the window.
+        float rodY = top + 0.2f, rodZ = inner - 0.11f, rodLen = ww + 0.75f;
+        var rod = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.DestroyImmediate(rod.GetComponent<Collider>());
+        rod.name = "Curtain Rod";
+        rod.transform.SetParent(win, false);
+        rod.transform.localPosition = new Vector3(0f, rodY, rodZ);
+        rod.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+        rod.transform.localScale = new Vector3(0.025f, rodLen / 2f, 0.025f);
+        rod.GetComponent<MeshRenderer>().sharedMaterial = rodMat;
+        foreach (float side in new[] { -1f, 1f })
+            Box(win, side < 0f ? "Bracket Left" : "Bracket Right", new Vector3(side * (rodLen / 2f - 0.06f), rodY, (inner + rodZ) / 2f), new Vector3(0.02f, 0.04f, inner - rodZ), rodMat);
+
+        // Two curtains drawn back, each an accordion of soft folds hanging from the rod to
+        // just below the sill, slightly overlapping the window's edge.
+        float drop = rodY - 0.03f - (sill - 0.18f);
+        Curtain(win, "Curtain Left", -1f, ww, rodY - 0.03f, drop, rodZ, cloth);
+        Curtain(win, "Curtain Right", 1f, ww, rodY - 0.03f, drop, rodZ, cloth);
+    }
+
+    static void Curtain(Transform parent, string name, float side, float ww, float hangY, float drop, float z, Material cloth)
+    {
+        var c = new GameObject(name).transform;
+        c.SetParent(parent, false);
+        const int folds = 9;
+        const float pitch = 0.06f, depth = 0.045f;
+        float inner = ww / 2f - 0.12f;                 // its inner edge, a little over the glass
+        for (int i = 0; i < folds; i++)
+        {
+            // Zigzag between the front and back of the folds, outward from the inner edge.
+            float x0 = side * (inner + i * pitch), x1 = side * (inner + (i + 1) * pitch);
+            float z0 = z + (i % 2 == 0 ? 0f : depth) - depth / 2f, z1 = z + (i % 2 == 0 ? depth : 0f) - depth / 2f;
+            Vector3 a = new Vector3(x0, 0f, z0), b = new Vector3(x1, 0f, z1);
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.name = "Fold " + (i + 1);
+            go.transform.SetParent(c, false);
+            // Each fold hangs a touch longer toward the outside, so the hem is not a ruler line.
+            float len = drop + (i % 3) * 0.012f;
+            go.transform.localPosition = (a + b) / 2f + Vector3.up * (hangY - len / 2f);
+            go.transform.localRotation = Quaternion.FromToRotation(Vector3.right, (b - a).normalized);
+            go.transform.localScale = new Vector3((b - a).magnitude + 0.006f, len, 0.008f);
+            go.GetComponent<MeshRenderer>().sharedMaterial = cloth;
+        }
     }
 
     // Bounds of `go`'s meshes in `space`'s local coordinates.
