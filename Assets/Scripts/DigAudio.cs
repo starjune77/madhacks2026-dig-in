@@ -234,6 +234,14 @@ public class DigAudio : MonoBehaviour
         Duck(2.5f);
     }
 
+    // Petting: the purr comes from the cat, louder and a little lower (warmer), for a while.
+    public void Pet(Vector3 at, float seconds)
+    {
+        petTimer = Mathf.Max(petTimer, seconds);
+        purrSource.transform.position = at + Vector3.up * 0.2f;
+    }
+    float petTimer;
+
     // The music steps back for a while (the cat talks, a card opens).
     public void Duck(float seconds) => duckTimer = Mathf.Max(duckTimer, seconds);
 
@@ -294,16 +302,19 @@ public class DigAudio : MonoBehaviour
         }
 
         // The cat purrs, softly, while you trade.
-        bool purring = game.shop != null && game.shop.IsOpen;
+        petTimer = Mathf.Max(0f, petTimer - dt);
+        bool petting = petTimer > 0f;
+        bool purring = (game.shop != null && game.shop.IsOpen) || petting;
         if (purring && !purrSource.isPlaying)
         {
-            var cat = FindAnyObjectByType<DigCat>();
-            purrSource.transform.position = cat != null ? cat.transform.position + Vector3.up * 0.2f : game.player.transform.position;
+            var cat = game.shopCat;
+            if (!petting) purrSource.transform.position = cat != null ? cat.transform.position + Vector3.up * 0.2f : game.player.transform.position;
             purrSource.clip = purr;
             purrSource.volume = 0f;
             purrSource.Play();
         }
-        purrSource.volume = Mathf.MoveTowards(purrSource.volume, purring ? 0.4f * effects : 0f, dt * 0.6f);
+        purrSource.volume = Mathf.MoveTowards(purrSource.volume, purring ? (petting ? 0.75f : 0.4f) * effects : 0f, dt * (petting ? 1.2f : 0.6f));
+        purrSource.pitch = Mathf.MoveTowards(purrSource.pitch, petting ? 0.93f : 1f, dt * 0.2f);
         if (!purring && purrSource.isPlaying && purrSource.volume <= 0.001f) purrSource.Stop();
 
         // Footsteps at the pace you walk: grass on the lawn, earth on the patch and below.

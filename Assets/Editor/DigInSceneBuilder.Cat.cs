@@ -8,8 +8,12 @@ using UnityEngine.Rendering;
 // and then, and a faster, softer rhythm when it purrs. DigCat turns it to watch you.
 public static partial class DigInSceneBuilder
 {
-    // The cat's model faces this way (degrees) before it is turned to face the yard.
-    const float CatModelYaw = 0f;
+    // Which way each cat model faces (degrees) before it is turned to face the yard: the
+    // Munchkin kitten (Meshy, from one original reference image) sitting, licking a paw,
+    // and asleep.
+    static float CatModelYaw(string meshyName) =>
+        meshyName == "Munchkin" ? CatYawSit : meshyName == "MunchkinLick" ? CatYawLick : meshyName == "MunchkinSleeping" ? CatYawSleep : 0f;
+    const float CatYawSit = 0f, CatYawLick = 0f, CatYawSleep = 40f;   // asleep: its face toward your eyes
 
     static RuntimeAnimatorController BuildCatAnimations()
     {
@@ -73,34 +77,61 @@ public static partial class DigInSceneBuilder
         AnimationUtility.SetAnimationClipSettings(clip, s);
     }
 
-    // Cat (DigCat, Animator) / Body (animated) / the model, standing on the origin.
-    static GameObject MakeCat(string meshyName, float length, bool watches)
+    // Cat (DigCat, Animator) / Body (animated) / one holder per pose, each with its model
+    // standing on the origin. `lickName`: a second pose of the same cat, licking a paw.
+    static GameObject MakeCat(string meshyName, float length, bool watches, string lickName = null)
     {
         var model = MeshyAsset(meshyName, 0.15f);
         if (model == null) return null;
-        var root = new GameObject(meshyName == "Cat" ? "Cat" : "Sleeping Cat");
+        var root = new GameObject(watches ? "Cat" : "Sleeping Cat");
         var body = new GameObject("Body").transform;
         body.SetParent(root.transform, false);
-        var go = (GameObject)PrefabUtility.InstantiatePrefab(model, body);
-        go.transform.localRotation = Quaternion.Euler(0f, CatModelYaw, 0f);
-        var b = LocalBounds(body);
-        go.transform.localScale *= length / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.z));
-        b = LocalBounds(body);
-        go.transform.localPosition -= new Vector3(b.center.x, b.min.y, b.center.z);
-        foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.On;
+        var sit = CatPose(model, meshyName, body, "Sit", length);
+        GameObject lick = null;
+        var lickModel = lickName != null ? MeshyAsset(lickName, 0.15f) : null;
+        if (lickModel != null)
+        {
+            // Scaled to the same height as the sitting cat, so it is the same size.
+            lick = CatPose(lickModel, lickName, body, "Lick", length);
+            float hs = LocalBounds(sit.transform).size.y, hl = LocalBounds(lick.transform).size.y;
+            var m = lick.transform.GetChild(0);
+            m.localScale *= hs / Mathf.Max(0.001f, hl);
+            var lb = LocalBounds(lick.transform);
+            m.localPosition -= new Vector3(lb.center.x, lb.min.y, lb.center.z);
+        }
+        foreach (var r in root.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.On;
 
         var animator = root.AddComponent<Animator>();
         animator.runtimeAnimatorController = BuildCatAnimations();
         animator.cullingMode = AnimatorCullingMode.CullCompletely;
         var cat = root.AddComponent<DigCat>();
         cat.watchDistance = watches ? 6f : 0f;
+        if (lick != null)
+        {
+            cat.sitPose = sit;
+            cat.lickPose = lick;
+            lick.SetActive(false);
+        }
         return root;
+    }
+
+    static GameObject CatPose(GameObject model, string meshyName, Transform body, string name, float length)
+    {
+        var holder = new GameObject(name);
+        holder.transform.SetParent(body, false);
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(model, holder.transform);
+        go.transform.localRotation = Quaternion.Euler(0f, CatModelYaw(meshyName), 0f);
+        var b = LocalBounds(holder.transform);
+        go.transform.localScale *= length / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.z));
+        b = LocalBounds(holder.transform);
+        go.transform.localPosition -= new Vector3(b.center.x, b.min.y, b.center.z);
+        return holder;
     }
 
     // The cat sits on the counter, at the end nearest the yard, looking out.
     static void BuildShopCat(Transform shop, GameObject counter)
     {
-        var cat = MakeCat("Cat", 0.36f, true);
+        var cat = MakeCat("Munchkin", 0.32f, true, "MunchkinLick");
         if (cat == null) return;
         cat.transform.SetParent(shop, false);
         var b = WorldBounds(counter);

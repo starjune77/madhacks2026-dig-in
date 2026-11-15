@@ -42,8 +42,8 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v16 audio settings";
-    const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
+    const string HudVersion = "v18 cat portrait";
+    const string HubVersion = "v7 munchkin";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
     const string PageVersion = "v1 page";
@@ -1126,6 +1126,8 @@ public static partial class DigInSceneBuilder
         if (game.findPrefabsByStratum == null || game.findPrefabsByStratum.Length == 0)
             game.findPrefabsByStratum = findPrefabs.Select(f => f.GetComponent<MemoryFind>()).ToArray();
         if (game.story == null) game.story = story;
+        var hubRoot = FindRoot(scene, "Surface Hub");
+        game.shopCat = hubRoot != null ? hubRoot.GetComponentsInChildren<DigCat>(true).FirstOrDefault(c => c.watchDistance > 0f) : null;
         var env = FindRoot(scene, "Environment");
         var lure = env != null ? env.Find("Dig Spot/Lure") : null;
         if (lure != null) game.digSpotLure = lure.gameObject;
