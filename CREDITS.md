@@ -27,16 +27,31 @@ All from [Poly Haven](https://polyhaven.com), licensed [CC0](https://polyhaven.c
 
 ## Sound
 
-All recorded foley from [OpenGameArt](https://opengameart.org), licensed [CC0](https://creativecommons.org/publicdomain/zero/1.0/). In `Assets/Audio/`.
+Recorded foley, field recordings and music from [Freesound](https://freesound.org), every one licensed [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (searched with the CC0 filter; each page checked). Cut into variations and seamless loops with `Assets/Editor/DigAudioCutter.cs`. In `Assets/Audio/`.
+
+| Sound | Sources |
+|---|---|
+| Digging into dirt: the bite (`Dig/Dirt/Bite_*`) | [Digging a Hole and Shovelling Soil/Dirt](https://freesound.org/people/Ali_6868/sounds/384361/) by Ali_6868, [Digging a Hole and Shovelling Soil/Dirt 2](https://freesound.org/people/Ali_6868/sounds/384362/) by Ali_6868, [SHOVELING.WAV](https://freesound.org/people/ernstBWP/sounds/568846/) by ernstBWP, [Digging Into Soft Soil with Small Trowell.wav](https://freesound.org/people/dhallcomposer/sounds/696531/) by dhallcomposer |
+| Digging into dirt: the soil lifted (`Dig/Dirt/Lift_*`) | [scrabble and soft sand pour.mp3](https://freesound.org/people/mariethompson/sounds/516923/) by mariethompson, [Shovel_dirt.wav](https://freesound.org/people/dr19/sounds/353907/) by dr19 |
+| Digging into clay (`Dig/Clay/*`) | [Digging in wet course sand (raw file)](https://freesound.org/people/f3bbbo/sounds/651294/) by f3bbbo, [digging into mud.wav](https://freesound.org/people/Stefan21100190/sounds/593113/) by Stefan21100190 |
+| Digging into stone (`Dig/Stone/*`) | [Shoveling Gravel](https://freesound.org/people/Charisma_Vigoureux_241085/sounds/764821/) by Charisma_Vigoureux_241085, [Gravels lifting with a Shovel](https://freesound.org/people/Zeinel-2-and-Hope-sounds-3/sounds/787858/) by Zeinel-2-and-Hope-sounds-3, [Digging in stoney dirt](https://freesound.org/people/innov8_Music/sounds/871629/) by innov8_Music, [Digging Gravel.MP3](https://freesound.org/people/djbc979/sounds/530085/) by djbc979 |
+| Grains trickling off the blade (`Dig/Trickle/*`) | [sandfall5.wav](https://freesound.org/people/Wagna/sounds/326304/) by Wagna, [Sand slidding out of shovel slowly.wav](https://freesound.org/people/XfiXy8/sounds/467301/) by XfiXy8, [SAND POUR.wav](https://freesound.org/people/nicoproson/sounds/627070/) by nicoproson |
+| Clods landing (`Dig/Clods/*`) | [Falling In Dirt.wav](https://freesound.org/people/FocusBay/sounds/210867/) by FocusBay, [Falling_Mud.wav](https://freesound.org/people/lzmraul/sounds/389455/) by lzmraul, [Gravel Stone Dirt Debris Falling Small 1 12](https://freesound.org/people/Sheyvan/sounds/569745/) by Sheyvan |
+| Footsteps on grass (`Steps/Grass/*`) | [Hiking Boot Footsteps on Grass](https://freesound.org/people/Fission9/sounds/521587/) by Fission9, [snd_footsteps_grass.wav](https://freesound.org/people/drowsyprincess/sounds/463854/) by drowsyprincess |
+| Footsteps on earth (`Steps/Dirt/*`) | [Footsteps_6_Dirt_shoe.wav](https://freesound.org/people/monte32/sounds/353799/) by monte32, [Footsteps Dirt Road 1.wav](https://freesound.org/people/HenKonen/sounds/682127/) by HenKonen, [Footsteps - Dirt, Grass, Ground, Nature](https://freesound.org/people/SecureSubset/sounds/813621/) by SecureSubset |
+| The yard (`Ambience/Yard`, `Ambience/Garden`, crossfaded loops) | [gardenBirdsNature.wav](https://freesound.org/people/titi2/sounds/426459/) by titi2, [Garden Sunny Day.wav](https://freesound.org/people/Modding/sounds/574108/) by Modding |
+| Blackbird calls around the yard (`Ambience/Birds/*`) | [Blackbird (isolated)](https://freesound.org/people/richwise/sounds/811988/) by richwise, [Blackbird song, solo, Good quality, Forest South of France](https://freesound.org/people/Sacha.Julien/sounds/725332/) by Sacha.Julien |
+| Tunnel room tone (`Ambience/RoomTone`) | [Soft Room Tone](https://freesound.org/people/callmethefoo/sounds/744447/) by callmethefoo |
+| The cat: purrs and meows (`Cat/*`) | [Cat Purr 301 M](https://freesound.org/people/BadIdeaProductions/sounds/856508/) by BadIdeaProductions, [cat purrs again.flac](https://freesound.org/people/arseniiv/sounds/707237/) by arseniiv, [Mavis_cat-meow-soft_01](https://freesound.org/people/TBMcQueen/sounds/825631/) by TBMcQueen, [Mavis_cat-meow-soft-whine_01](https://freesound.org/people/TBMcQueen/sounds/825630/) by TBMcQueen, [Meow (Gentle)](https://freesound.org/people/sokworks/sounds/866536/) by sokworks |
+| Music: the yard (`Music/Yard`) and the ending (`Music/Ending`, its first bars) | [Memories - Nostalgic Simple Piano Melody](https://freesound.org/people/emma.emma.emma/sounds/827125/) by emma.emma.emma |
+| Music: underground (`Music/Underground`) | [Melancholy Piano Melody](https://freesound.org/people/SamRodeghier/sounds/496113/) by SamRodeghier |
+
+Still from [OpenGameArt](https://opengameart.org), CC0:
 
 | Sound | Source |
 |---|---|
-| Digging into soil (`Dig/Dig_*`) | [25 CC0 mud SFX](https://opengameart.org/content/25-cc0-mud-sfx) |
-| Shovel on stone, footsteps, mineral clinks (`Dig/Stone_*`, `Steps/*`, `Minerals/*`) | [100 CC0 SFX #2](https://opengameart.org/content/100-cc0-sfx-2) |
+| Mineral clinks (`Minerals/*`) | [100 CC0 SFX #2](https://opengameart.org/content/100-cc0-sfx-2) |
 | Pages for cards, letters and the shop (`UI/*`) | [Book Flip Sounds](https://opengameart.org/content/book-flip-sounds) |
-| Cat meows and purrs (`Cat/*`) | [Cat Purr & Meow](https://opengameart.org/content/cat-purr-meow) |
-| Birds and wind (`Ambience/Birds`, `Ambience/Wind`, cut into 60 s mono loops) | [Park Ambiences](https://opengameart.org/content/park-ambiences) |
-| The underground hum (`Ambience/Underground`) | [Loopable Dungeon Ambience](https://opengameart.org/content/loopable-dungeon-ambience) |
 
 ## Fonts
 
