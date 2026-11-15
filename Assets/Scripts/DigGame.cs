@@ -150,6 +150,7 @@ public class DigGame : MonoBehaviour
         lastAmount = radius / shovelRadius[shovelLevel];
         tossPending = true;
         shovel.ShowLoad(debris.clodMaterials[Mathf.Clamp(stratum, 0, debris.clodMaterials.Length - 1)], lastAmount);
+        hasDug = true;
         return DigOutcome.Dug;
     }
 
@@ -186,14 +187,18 @@ public class DigGame : MonoBehaviour
         return true;
     }
     float bagFullHint;
-    bool doorTried, digHinted, catHinted;
+    bool doorTried, catHinted, hasDug;
     [Header("Where to dig")]
-    [Tooltip("The bare patch where the dig begins (the sign, stones and trowel are around it).")]
+    [Tooltip("The bare patch where the dig begins (stones, flowers and a trowel around it).")]
     public Vector3 digSpot = new Vector3(2.5f, 0f, 2.5f);
-    [Tooltip("Shown the first time the player walks up to the dig spot.")]
+    [Tooltip("Shown under the crosshair while standing on the patch, until the first dig.")]
     public string digHint = "Hold <b>left click</b> to dig.";
+    public float digHintRadius = 2.6f;
     [Tooltip("The cat says this the first time you pass the shop, if you have not started digging.")]
-    public string catHint = "The cat looks at you, then at the little sign by the hollow.  <i>“The soft ground is over there.”</i>";
+    public string catWonder = "The cat watches the bare patch by the stones for a moment.  <i>“Something's under the soft ground, I think.”</i>";
+    [Tooltip("What draws the eye to the patch (the glint, the pool of light). It fades away once you dig.")]
+    public GameObject digSpotLure;
+    float lureFade = 1f;
     [Header("Dream")]
     [Tooltip("Standing here, the player tries the back door.")]
     public Vector3 backDoor = new Vector3(3.2f, 0.8f, -15.2f);
@@ -481,6 +486,21 @@ public class DigGame : MonoBehaviour
         player.SetLook(spawnPoint.eulerAngles.y, 0f);
     }
 
+    // The glint and the light on the patch ease away once the first earth is turned.
+    void FadeLure()
+    {
+        lureFade = Mathf.MoveTowards(lureFade, 0f, Time.deltaTime / 3f);
+        foreach (var l in digSpotLure.GetComponentsInChildren<Light>())
+        {
+            if (!lureIntensity.ContainsKey(l)) lureIntensity[l] = l.intensity;
+            l.intensity = lureIntensity[l] * lureFade;
+        }
+        foreach (var ps in digSpotLure.GetComponentsInChildren<ParticleSystem>())
+            if (ps.isEmitting) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        if (lureFade <= 0f) digSpotLure.SetActive(false);
+    }
+    readonly Dictionary<Light, float> lureIntensity = new Dictionary<Light, float>();
+
     void Update()
     {
         // Whatever happens, nobody is left under the world.
@@ -489,18 +509,15 @@ public class DigGame : MonoBehaviour
         float depth = Mathf.Max(0f, -player.FeetY);
         DeepestDepth = Mathf.Max(DeepestDepth, depth);
 
-        // Where to dig: a hint the first time you walk up to the spot, and the cat points
-        // you there the first time you pass the shop (if you have not started yet).
+        // Where to dig: nothing says so until you stand on the patch (then, until the first
+        // dig, a quiet prompt), and the cat wonders about it the first time you pass the shop.
         Vector3 here = player.transform.position;
-        if (!digHinted && depth < 0.5f && new Vector2(here.x - digSpot.x, here.z - digSpot.z).magnitude < 3.6f)
-        {
-            digHinted = true;
-            hud.ShowMessage(digHint, 5f);
-        }
+        bool onSpot = !hasDug && depth < 0.5f && new Vector2(here.x - digSpot.x, here.z - digSpot.z).magnitude < digHintRadius;
+        if (hasDug && digSpotLure != null && digSpotLure.activeSelf) FadeLure();
         if (!catHinted && DeepestDepth < 0.6f && !InputLocked && workbench != null && (here - workbench.transform.position).sqrMagnitude < 4.5f * 4.5f)
         {
             catHinted = true;
-            hud.ShowMessage(catHint, 5f);
+            hud.ShowMessage(catWonder, 5f);
         }
 
         // The back door does not open. Nobody is home; nobody ever is, here.
@@ -510,7 +527,8 @@ public class DigGame : MonoBehaviour
             hud.ShowMessage("The back door won't open. It's very quiet inside.", 4f);
         }
         hud.SetStatus(depth, ShovelName, coins, bag.Count, shop != null ? shop.BagSize : 6);
-        hud.SetPrompt(ShopPrompt());
+        string prompt = ShopPrompt();
+        hud.SetPrompt(string.IsNullOrEmpty(prompt) && onSpot && !InputLocked ? digHint : prompt);
         if (atmosphere != null && shop != null) atmosphere.lanternPower = shop.LanternPower;
     }
 }

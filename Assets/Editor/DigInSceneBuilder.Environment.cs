@@ -41,6 +41,8 @@ public static partial class DigInSceneBuilder
         Ensure(env, "House", BuildHouse);
         Ensure(env, "Yard", BuildYard);
         Ensure(env, "Rocks and Trees", BuildSurroundings);
+        var oldSpot = env.Find("Dig Spot");
+        if (oldSpot != null && oldSpot.Find(DigSpotVersion) == null) Object.DestroyImmediate(oldSpot.gameObject);
         Ensure(env, "Dig Spot", BuildDigSpot);
     }
 

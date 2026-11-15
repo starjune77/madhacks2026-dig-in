@@ -1120,6 +1120,9 @@ public static partial class DigInSceneBuilder
         if (game.findPrefabsByStratum == null || game.findPrefabsByStratum.Length == 0)
             game.findPrefabsByStratum = findPrefabs.Select(f => f.GetComponent<MemoryFind>()).ToArray();
         if (game.story == null) game.story = story;
+        var env = FindRoot(scene, "Environment");
+        var lure = env != null ? env.Find("Dig Spot/Lure") : null;
+        if (lure != null) game.digSpotLure = lure.gameObject;
         EditorUtility.SetDirty(game);
 
         if (shop.hud == null) shop.hud = game.hud;
