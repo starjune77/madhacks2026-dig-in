@@ -29,6 +29,9 @@ public class DigAudio : MonoBehaviour
     [Tooltip("Depth (m) by which the surface has faded away and the hum is full.")]
     public float fullDepth = 6f;
 
+    // True in the bedroom: the yard's ambience and footsteps are silent.
+    [System.NonSerialized] public bool Muted;
+
     AudioSource[] pool;
     int next;
     AudioSource birdsSource, windSource, humSource, purrSource;
@@ -128,7 +131,7 @@ public class DigAudio : MonoBehaviour
         float depth = Mathf.Max(0f, -game.player.FeetY);
         float under = Mathf.Clamp01(depth / fullDepth);
         float surface = 1f - Mathf.SmoothStep(0f, 1f, under);
-        float target = ambience * master;
+        float target = Muted ? 0f : ambience * master;
         birdsSource.volume = Mathf.MoveTowards(birdsSource.volume, target * 0.8f * surface, Time.deltaTime);
         windSource.volume = Mathf.MoveTowards(windSource.volume, target * 0.55f * Mathf.Max(surface, 0.08f), Time.deltaTime);
         surfaceFilter.cutoffFrequency = Mathf.Lerp(22000f, 500f, Mathf.Sqrt(under));
@@ -136,6 +139,7 @@ public class DigAudio : MonoBehaviour
         humSource.pitch = Mathf.Lerp(1f, 0.82f, Mathf.Clamp01(depth / 30f));   // deeper down, a deeper hum
 
         // The cat purrs while the shop is open.
+        if (Muted) return;   // the bedroom: only the sleepy purr
         bool purring = game.shop != null && game.shop.IsOpen;
         if (purring && !purrSource.isPlaying) { purrSource.volume = 0f; purrSource.Play(); }
         purrSource.volume = Mathf.MoveTowards(purrSource.volume, purring ? 0.35f * effects * master : 0f, Time.deltaTime * 0.6f);

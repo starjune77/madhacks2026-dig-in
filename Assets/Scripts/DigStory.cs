@@ -22,6 +22,17 @@ public class DigStory : MonoBehaviour
     public float blackHold = 1.2f;
     public float fadeIn = 2.5f;
 
+    [Header("Waking up")]
+    [Tooltip("The bedroom's camera: morning, the cat asleep on your chest.")]
+    public Camera wakeCamera;
+    [Tooltip("The one quiet line, shown a while after the room fades in. Empty = none.")]
+    public string wakeLine = "Morning.";
+    public float black2 = 2.5f;
+    public float wakeFadeIn = 4f;
+    public float wakeLineDelay = 5f;
+    [Tooltip("Seconds in bed before a click takes you back to the yard (for the demo).")]
+    public float wakeHold = 8f;
+
     [Tooltip("Seconds an overlay ignores input after opening, so the click that opened it does not close it.")]
     public float inputGrace = 0.35f;
 
@@ -31,7 +42,7 @@ public class DigStory : MonoBehaviour
     public float lineFade = 1.4f;
 
     enum Mode { None, Card, Letter, Ending }
-    enum EndingPhase { Words, FadeOut, Black, FadeIn }
+    enum EndingPhase { Words, FadeOut, Black, Wake, Return, FadeIn }
     EndingPhase phase;
     float phaseTime;
     Mode mode;
@@ -99,14 +110,59 @@ public class DigStory : MonoBehaviour
                 }
                 break;
             case EndingPhase.Black:
+                // A long breath of black, then you wake up.
                 hud.SetFade(1f);
-                if (phaseTime >= blackHold) Next(EndingPhase.FadeIn);
+                if (phaseTime >= (wakeCamera != null ? black2 : blackHold))
+                {
+                    if (wakeCamera != null)
+                    {
+                        Wake(true);
+                        Next(EndingPhase.Wake);
+                    }
+                    else Next(EndingPhase.FadeIn);
+                }
+                break;
+            case EndingPhase.Wake:
+                hud.SetFade(1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(phaseTime / wakeFadeIn)));
+                if (!string.IsNullOrEmpty(wakeLine) && phaseTime >= wakeLineDelay && !wakeLineShown)
+                {
+                    wakeLineShown = true;
+                    hud.ShowMessage("<i>" + wakeLine + "</i>", 999f);
+                }
+                if (phaseTime >= wakeHold && ContinuePressed()) Next(EndingPhase.Return);
+                break;
+            case EndingPhase.Return:
+                // Back to the yard, where the shelf is full (for whoever plays next).
+                hud.SetFade(Mathf.Clamp01(phaseTime / fadeOut));
+                if (phaseTime >= fadeOut)
+                {
+                    hud.ShowMessage("", 0.01f);
+                    Wake(false);
+                    Next(EndingPhase.FadeIn);
+                }
                 break;
             case EndingPhase.FadeIn:
                 hud.SetFade(1f - Mathf.Clamp01(phaseTime / fadeIn));
                 if (phaseTime >= fadeIn) Close();
                 break;
         }
+    }
+
+    bool wakeLineShown;
+
+    // The bedroom: its camera takes over, the HUD's status hides, the cat purrs.
+    void Wake(bool on)
+    {
+        wakeLineShown = false;
+        wakeCamera.gameObject.SetActive(on);
+        game.player.cam.GetComponent<Camera>().enabled = !on;
+        var listener = game.player.cam.GetComponent<AudioListener>();
+        if (listener != null) listener.enabled = !on;
+        var wakeListener = wakeCamera.GetComponent<AudioListener>();
+        if (wakeListener != null) wakeListener.enabled = on;
+        hud.SetHidden(on);
+        DigAudio.I?.SleepyPurr(on);
+        if (DigAudio.I != null) DigAudio.I.Muted = on;
     }
 
     void Next(EndingPhase p)

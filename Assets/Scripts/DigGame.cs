@@ -180,6 +180,10 @@ public class DigGame : MonoBehaviour
         return true;
     }
     float bagFullHint;
+    bool doorTried;
+    [Header("Dream")]
+    [Tooltip("Standing here, the player tries the back door.")]
+    public Vector3 backDoor = new Vector3(3.2f, 0.8f, -15.2f);
 
     public int SellBag(out int count)
     {
@@ -430,6 +434,13 @@ public class DigGame : MonoBehaviour
 
         float depth = Mathf.Max(0f, -player.FeetY);
         DeepestDepth = Mathf.Max(DeepestDepth, depth);
+
+        // The back door does not open. Nobody is home; nobody ever is, here.
+        if (!doorTried && (player.transform.position - backDoor).sqrMagnitude < 1.6f * 1.6f)
+        {
+            doorTried = true;
+            hud.ShowMessage("The back door won't open. It's very quiet inside.", 4f);
+        }
         hud.SetStatus(depth, ShovelName, coins, bag.Count, shop != null ? shop.BagSize : 6);
         hud.SetPrompt(ShopPrompt());
         if (atmosphere != null && shop != null) atmosphere.lanternPower = shop.LanternPower;

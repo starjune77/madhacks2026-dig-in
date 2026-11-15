@@ -135,6 +135,7 @@ public static partial class DigInSceneBuilder
         BuildEnvironment(scene);
         BuildDigSite(scene, m, feel);
         BuildHub(scene, shelfPrefab, benchPrefab);
+        BuildBedroom(scene);
 
         var player = Root(scene, "Player", out bool newPlayer, playerPrefab);
         if (newPlayer) player.position = SpawnPos;
@@ -1142,6 +1143,9 @@ public static partial class DigInSceneBuilder
         if (story != null)
         {
             if (story.ending == null) story.ending = endingLetter;
+            var bedroom = FindRoot(scene, "Bedroom");
+            var wake = bedroom != null ? bedroom.Find("Wake Camera") : null;
+            if (wake != null) story.wakeCamera = wake.GetComponent<Camera>();
             EditorUtility.SetDirty(story);
         }
     }
