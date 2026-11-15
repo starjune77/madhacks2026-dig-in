@@ -41,6 +41,7 @@ public static partial class DigInSceneBuilder
         Ensure(env, "House", BuildHouse);
         Ensure(env, "Yard", BuildYard);
         Ensure(env, "Rocks and Trees", BuildSurroundings);
+        Ensure(env, "Dig Spot", BuildDigSpot);
     }
 
     // ---- Height function (shared by terrain and prop placement) --------------------

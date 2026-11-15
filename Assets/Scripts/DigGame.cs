@@ -186,7 +186,14 @@ public class DigGame : MonoBehaviour
         return true;
     }
     float bagFullHint;
-    bool doorTried;
+    bool doorTried, digHinted, catHinted;
+    [Header("Where to dig")]
+    [Tooltip("The bare patch where the dig begins (the sign, stones and trowel are around it).")]
+    public Vector3 digSpot = new Vector3(2.5f, 0f, 2.5f);
+    [Tooltip("Shown the first time the player walks up to the dig spot.")]
+    public string digHint = "Hold <b>left click</b> to dig.";
+    [Tooltip("The cat says this the first time you pass the shop, if you have not started digging.")]
+    public string catHint = "The cat looks at you, then at the little sign by the hollow.  <i>“The soft ground is over there.”</i>";
     [Header("Dream")]
     [Tooltip("Standing here, the player tries the back door.")]
     public Vector3 backDoor = new Vector3(3.2f, 0.8f, -15.2f);
@@ -437,6 +444,7 @@ public class DigGame : MonoBehaviour
     public void Interact()
     {
         if (shop == null || workbench == null || !workbench.InRange(player.transform.position)) return;
+        catHinted = true;   // you found the cat; it can tell you itself
         shop.Open();
     }
 
@@ -479,6 +487,20 @@ public class DigGame : MonoBehaviour
 
         float depth = Mathf.Max(0f, -player.FeetY);
         DeepestDepth = Mathf.Max(DeepestDepth, depth);
+
+        // Where to dig: a hint the first time you walk up to the spot, and the cat points
+        // you there the first time you pass the shop (if you have not started yet).
+        Vector3 here = player.transform.position;
+        if (!digHinted && depth < 0.5f && new Vector2(here.x - digSpot.x, here.z - digSpot.z).magnitude < 3.6f)
+        {
+            digHinted = true;
+            hud.ShowMessage(digHint, 5f);
+        }
+        if (!catHinted && DeepestDepth < 0.6f && !InputLocked && workbench != null && (here - workbench.transform.position).sqrMagnitude < 4.5f * 4.5f)
+        {
+            catHinted = true;
+            hud.ShowMessage(catHint, 5f);
+        }
 
         // The back door does not open. Nobody is home; nobody ever is, here.
         if (!doorTried && (player.transform.position - backDoor).sqrMagnitude < 1.6f * 1.6f)
