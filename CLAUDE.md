@@ -70,7 +70,7 @@ Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline 
 - Every third-party asset (textures, models, sounds) is listed with its source and licence in `CREDITS.md` when it is added.
 - Build Scene: `unity command script eval -- --code 'DigInSceneBuilder.BuildSceneUnattended(); return 1;'` (never use `BuildScene()` from automation: it can open a save prompt that blocks the Editor). Screenshots: `unity command capture game_view -- --source screen --output-path <absolute path outside the repo>`.
 - Run `unity` from Git Bash, not PowerShell 5.1 (it strips the quotes inside C# snippets).
-- Simulated keys and clicks do not reach the game while the Editor window is in the background. Drive the game through its public methods instead (`DigGame.I.DemoJump(n)`, `DemoEnding()`, `DigGame.I.Dig(...)`, `TryPickUp`, `player.Teleport` / `SetLook`), and ask the developer to check anything that needs real input.
+- `runtime simulate_key` does not reach the game while the Editor window is in the background, but input queued through the Input System does: from `script eval`, `InputSystem.QueueStateEvent(Mouse.current, new MouseState { position = ..., buttons = 1 })` (then `buttons = 0` in a later call), or `KeyboardState(Key.Escape)`, without calling `InputSystem.Update()`. That clicks real UI buttons (positions in Game view pixels, origin bottom left). Set the Game view to a fixed 1920x1080 first (`UnityEditor.GameViewSizes` by reflection) so screenshots and clicks match a 1080p screen. Otherwise drive the game through its public methods (`DigGame.I.DemoJump(n)`, `DemoEnding()`, `DigGame.I.Dig(...)`, `TryPickUp`, `player.Teleport` / `SetLook`). Feel still needs the developer.
 - Screenshots cannot show feel. Anything about feel (swing, impact, debris, movement) needs a developer play-test before it counts as done.
 
 ## Meshy (generated 3D assets)
@@ -91,7 +91,8 @@ Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline 
   - `DigScoop.cs`, `DigDebris.cs` (+ `DigClodBody.cs`), `DigAim.cs`: the scoop tween, the clods/crumbs/dust and heaps, the aim ring.
   - `DigGrass.cs` (on "Dig Site/Grass"): instanced grass clumps on the diggable yard, removed where the ground is dug or covered.
   - `DigMinerals.cs` + `MineralData.cs`: mineral spots, showing, popping out, picking up. Data in `Assets/Data/Minerals/`.
-  - `DigShop.cs` (on "Game"): the cat's price board, prices, the cat's lines (including the ones a cat couldn't know).
+  - `DigShop.cs` (on "Game"): the cat's price board (sell tiles and tier cards with pictures rendered from the models, `DigShopTile.cs` lifts them under the mouse), prices, the cat's lines (including the ones a cat couldn't know).
+  - `DigPause.cs` (on "Game"): the Esc pause menu (notebook page over the blurred "Pause Blur" volume; Settings saved in PlayerPrefs) and the first-launch How to Play note.
   - `DigCat.cs`: the cat's breathing and purring (Animator, `Assets/Animations/Cat.controller`), turning to watch you.
   - `DigAudio.cs` (on "Game"): all sound; clips in `Assets/Audio/`.
   - `DigPlayer.cs`, `DigShovel.cs`: movement, look, dig input; the animated spade (clips in `Assets/Animations/`).
@@ -99,7 +100,7 @@ Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline 
   - `DigAtmosphere.cs`: darker, warmer light and fog with depth; the lantern.
   - `MemoryData.cs` (memories and fragments), `MemoryFind.cs`, `MemoryShelf.cs`, `LetterData.cs`, `Workbench.cs` (the shop counter's interact spot), `DigDemo.cs` (demo mode and `-benchmark`).
 - `Assets/Shaders/`: `DigSoil.shader` (the ground: photoscanned triplanar soil/clay/stone/grass, matte), `DigClod.shader` (loose earth), `DigTriplanar.hlsl`.
-- `Assets/Editor/DigInSceneBuilder*.cs`: the setup script, split by topic: main (assets, prefabs, dig site, hub, wiring), Environment (terrain, house, yard, trees), Realistic (sky, post, model import), Soil, Feel (swing clips, clods, particles), Economy (minerals, shop UI), Cat, Bedroom (the ending), Fragments, Meshy (memory finds and card art), Audio.
+- `Assets/Editor/DigInSceneBuilder*.cs`: the setup script, split by topic: main (assets, prefabs, dig site, hub, wiring), Environment (terrain, house, yard, trees), Realistic (sky, post, model import), Soil, Feel (swing clips, clods, particles), Economy (minerals, shop UI), ShopArt (shop pictures, spade tier materials), DigSpot (the lure around the bare patch), Pause (pause menu, How to Play, blur volume), Cat, Bedroom (the ending), Fragments, Meshy (memory finds and card art), Audio.
 - `Assets/ThirdParty/`: `PolyHaven/` (textures, `Models/`), `UnityTerrainDemo/` (only what is used), `Meshy/`. Do not edit files there.
 
 ## Demo mode
