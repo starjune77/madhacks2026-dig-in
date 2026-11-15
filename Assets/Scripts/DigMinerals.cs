@@ -25,6 +25,17 @@ public class DigMinerals : MonoBehaviour
     [Tooltip("Extra spots anywhere in the volume, for those who wander.")]
     public int strays = 60;
 
+    [Header("A generous start, and never too long without a find")]
+    [Tooltip("Extra spots per metre along the first stretch of the path (common, shallow).")]
+    public float earlyPerMetre = 4f;
+    public float earlyLength = 14f;
+    [Tooltip("Scoops before the very first find is guaranteed.")]
+    public int firstFindScoops = 7;
+    [Tooltip("Scoops in a row without a find before the next one brings one, per stratum (deeper is rarer).")]
+    public int[] pityScoops = { 4, 6, 7 };
+    int dryScoops;
+    bool foundAny;
+
     [Header("Showing and picking up")]
     [Tooltip("Every specimen is this many times its kind's size, so it reads from 2-3 m away.")]
     public float sizeScale = 2f;
@@ -126,6 +137,13 @@ public class DigMinerals : MonoBehaviour
             Vector3 p = path.PointAt(d) + Random3(rng) * spread * Mathf.Sqrt(R());
             Add(p, rng);
         }
+        int early = Mathf.RoundToInt(earlyLength * earlyPerMetre);
+        for (int i = 0; i < early; i++)
+        {
+            float d = Mathf.Lerp(0.5f, earlyLength, R());
+            Vector3 p = path.PointAt(d) + Random3(rng) * spread * 0.8f * Mathf.Sqrt(R());
+            Add(p, rng);
+        }
         for (int i = 0; i < strays; i++)
         {
             var p = DigVolume.Min + new Vector3(R() * DigVolume.Size.x, R() * (DigVolume.Size.y - 6f), R() * DigVolume.Size.z);
@@ -158,17 +176,45 @@ public class DigMinerals : MonoBehaviour
         spots.Add(new Spot { position = p, kind = kind, rotation = Quaternion.Euler((float)rng.NextDouble() * 360f, (float)rng.NextDouble() * 360f, 0f) });
     }
 
-    // Called when a scoop has opened (DigGame): minerals it reached pop out.
+    // Called when a scoop has opened (DigGame): minerals it reached pop out. After a few
+    // scoops in a row with nothing, this one brings one anyway (sooner for the very first).
     public void Freed(Vector3 center, float radius, Vector3 toward)
     {
         float r = radius + freeMargin;
+        int freed = 0;
         foreach (var s in spots)
         {
             if (s.taken || s.loose != null) continue;
             if ((s.position - center).sqrMagnitude > r * r) continue;
             if (volume.Solid(s.position) && (s.position - center).sqrMagnitude > radius * radius * 0.7f) continue;   // still held by earth
             PopOut(s, toward);
+            freed++;
         }
+        if (freed > 0) { dryScoops = 0; foundAny = true; return; }
+        dryScoops++;
+        int stratum = Mathf.Clamp(volume.StratumAt(center), 0, pityScoops.Length - 1);
+        if (dryScoops < (foundAny ? pityScoops[stratum] : firstFindScoops)) return;
+        dryScoops = 0;
+        foundAny = true;
+        Grant(center - toward.normalized * radius * 0.3f, toward, volume.StratumAt(center));
+    }
+
+    // A mineral of this stratum's kinds, out of the scoop just made.
+    void Grant(Vector3 at, Vector3 toward, int stratum)
+    {
+        float total = 0f;
+        foreach (var k in kinds) total += Mathf.Max(0f, k.weightByStratum[stratum]);
+        if (total <= 0f) return;
+        float pick = Random.value * total;
+        MineralData kind = kinds[0];
+        foreach (var k in kinds)
+        {
+            pick -= Mathf.Max(0f, k.weightByStratum[stratum]);
+            if (pick <= 0f) { kind = k; break; }
+        }
+        var s = new Spot { position = at, kind = kind, rotation = Random.rotation };
+        spots.Add(s);
+        PopOut(s, toward);
     }
 
     void PopOut(Spot s, Vector3 toward)
