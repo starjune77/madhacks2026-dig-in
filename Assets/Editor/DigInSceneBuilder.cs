@@ -40,7 +40,7 @@ public static partial class DigInSceneBuilder
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
     const string PlayerVersion = "v11 spade tiers";
     const string FindVersion = "v5 polyhaven";
-    const string ShelfVersion = "v5 meshy shelf";
+    const string ShelfVersion = "v6 measured rows";
     const string BenchVersion = "v3 meshy counter";
     const string HudVersion = "v20 review";
     const string HubVersion = "v7 munchkin";              // marker child of scene/Surface Hub
@@ -607,8 +607,9 @@ public static partial class DigInSceneBuilder
         col.center = b.center;
         col.size = b.size;
 
-        // Shelf board tops in the Kenney model, as a fraction of its height.
-        float[] rowTop = ShelfRows;
+        // The shelf boards, measured on the model itself: Childhood on the highest board with
+        // room for a card, then School Days, then Growing Up.
+        float[] rowTop = MeasureShelfRows(holder, b);
         var slotsRoot = new GameObject("Slots").transform;
         slotsRoot.SetParent(root.transform, false);
         shelf.slots = new MemoryShelf.Slot[9];
@@ -617,17 +618,63 @@ public static partial class DigInSceneBuilder
             int row = i / 3, column = i % 3;
             var slot = new GameObject("Slot " + (i + 1)).transform;
             slot.SetParent(slotsRoot, false);
-            slot.localPosition = new Vector3(b.center.x + (1 - column) * b.size.x * 0.29f, b.min.y + b.size.y * rowTop[row] + 0.005f, b.center.z);
+            slot.localPosition = new Vector3(b.center.x + (1 - column) * b.size.x * 0.29f, rowTop[row] + 0.003f, b.center.z);
             shelf.slots[i] = BuildShelfCard(slot, m, font);
         }
         return SavePrefab(root, path);
+    }
+
+    // Heights (holder space) of the three highest shelf boards with room above them for a
+    // card, found by casting down through the bookcase's mesh at the middle column.
+    static float[] MeasureShelfRows(Transform holder, Bounds b)
+    {
+        const float needed = 0.32f;   // card height plus the board above
+        var cols = new List<MeshCollider>();
+        foreach (var mf in holder.GetComponentsInChildren<MeshFilter>())
+        {
+            var mc = mf.gameObject.AddComponent<MeshCollider>();
+            mc.sharedMesh = mf.sharedMesh;
+            cols.Add(mc);
+        }
+        var tops = new List<float>();
+        float y = b.max.y + 0.2f;
+        for (int k = 0; k < 16; k++)
+        {
+            float best = float.MinValue;
+            Vector3 normal = Vector3.zero;
+            foreach (var mc in cols)
+            {
+                var origin = holder.TransformPoint(new Vector3(b.center.x, y, b.center.z));
+                if (mc.Raycast(new Ray(origin, -holder.up), out RaycastHit hit, 5f))
+                {
+                    float hy = holder.InverseTransformPoint(hit.point).y;
+                    if (hy > best) { best = hy; normal = hit.normal; }
+                }
+            }
+            if (best == float.MinValue) break;
+            if (Vector3.Dot(normal, holder.up) > 0.9f) tops.Add(best);
+            y = best - 0.015f;
+        }
+        foreach (var mc in cols) Object.DestroyImmediate(mc);
+
+        var rows = new List<float>();
+        for (int i = 1; i < tops.Count && rows.Count < 3; i++)
+            if (tops[i - 1] - tops[i] >= needed) rows.Add(tops[i]);
+        if (rows.Count < 3)
+        {
+            report.AppendLine("  shelf: measured only " + rows.Count + " rows, using fractions");
+            rows.Clear();
+            foreach (var f in ShelfRows) rows.Add(b.min.y + b.size.y * f);
+        }
+        report.AppendLine("  shelf rows at " + string.Join(", ", rows.ConvertAll(r => r.ToString("0.00"))));
+        return rows.ToArray();
     }
 
     // A small framed card standing on the shelf, leaning back. Built facing -Z (the way
     // quads and TMP text face) and turned around to face the room.
     static MemoryShelf.Slot BuildShelfCard(Transform slot, Mats m, TMP_FontAsset font)
     {
-        const float w = 0.26f, h = 0.34f;
+        const float w = 0.22f, h = 0.29f;
         var card = new GameObject("Card").transform;
         card.SetParent(slot, false);
         card.localRotation = Quaternion.Euler(8f, 180f, 0f);
