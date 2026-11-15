@@ -266,6 +266,41 @@ public static class DigAudioCutter
         }
     }
 
+    // Evens out a set of one-shots this tool wrote: each file's loudness (RMS) is set to
+    // `rmsDb`, but never so far that its peak passes `peakDb`.
+    public static string Level(string dir, string pattern, float rmsDb, float peakDb = -1f)
+    {
+        var sb = new StringBuilder();
+        foreach (var f in Directory.GetFiles(dir, pattern))
+        {
+            if (f.EndsWith(".meta")) continue;
+            var p = ReadWav(f);
+            double sum = 0; float peak = 1e-6f;
+            foreach (var v in p.data) { sum += v * v; peak = Mathf.Max(peak, Mathf.Abs(v)); }
+            float rms = (float)System.Math.Sqrt(sum / p.data.Length);
+            float g = Mathf.Min(Mathf.Pow(10f, rmsDb / 20f) / Mathf.Max(rms, 1e-6f), Mathf.Pow(10f, peakDb / 20f) / peak);
+            Gain(p, g);
+            Write(f, p);
+            sb.Append(Path.GetFileNameWithoutExtension(f) + " " + (20f * Mathf.Log10(rms * g)).ToString("0") + "  ");
+        }
+        return sb.ToString();
+    }
+
+    // Reads back a 16-bit PCM WAV as written by Write().
+    public static Pcm ReadWav(string path)
+    {
+        using (var r = new BinaryReader(File.OpenRead(path)))
+        {
+            r.ReadBytes(22);
+            int ch = r.ReadInt16(), rate = r.ReadInt32();
+            r.ReadBytes(12);   // byte rate, block align, bits, "data"
+            int bytes = r.ReadInt32();
+            var p = new Pcm { channels = ch, rate = rate, data = new float[bytes / 2] };
+            for (int i = 0; i < p.data.Length; i++) p.data[i] = r.ReadInt16() / 32768f;
+            return p;
+        }
+    }
+
     public static void Write(string path, Pcm p)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
