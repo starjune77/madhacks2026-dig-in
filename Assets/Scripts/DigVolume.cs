@@ -72,6 +72,12 @@ public class DigVolume : MonoBehaviour
     Texture3D pathTexture;
     Texture2D wobbleTexture;
 
+    // Where the top has been dug or covered with spoil, so grass no longer grows there
+    // (0..255 per 0.25 m column). Uploaded to the soil shader when it changes.
+    Texture2D disturbTexture;
+    NativeArray<byte> disturbed;
+    bool disturbDirty;
+
     // ---- Queries -------------------------------------------------------------------
     static float WobbleAt(float x, float z, float amount)
     {
@@ -165,6 +171,8 @@ public class DigVolume : MonoBehaviour
         if (iota.IsCreated) iota.Dispose();
         if (pathTexture != null) Destroy(pathTexture);
         if (wobbleTexture != null) Destroy(wobbleTexture);
+        if (disturbTexture != null) Destroy(disturbTexture);
+        if (disturbed.IsCreated) disturbed.Dispose();
         if (chunks != null)
             foreach (var c in chunks)
                 if (c != null && c.mesh != null) Destroy(c.mesh);
@@ -188,6 +196,12 @@ public class DigVolume : MonoBehaviour
         wobbleTexture.Apply(false, true);
         wdata.Dispose();
         Shader.SetGlobalTexture("_DigWobbleTex", wobbleTexture);
+
+        disturbed = new NativeArray<byte>(Nx * Nz, Allocator.Persistent);
+        disturbTexture = new Texture2D(Nx, Nz, TextureFormat.R8, false, true) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "Dig Disturbed Ground" };
+        disturbTexture.SetPixelData(disturbed, 0);
+        disturbTexture.Apply(false, false);
+        Shader.SetGlobalTexture("_DigDisturbTex", disturbTexture);
 
         int px = Mathf.RoundToInt(Size.x), py = Mathf.RoundToInt(Size.y), pz = Mathf.RoundToInt(Size.z);   // 1 m texels
         pathTexture = new Texture3D(px, py, pz, TextureFormat.R8, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "Dig Path Warmth" };
@@ -219,6 +233,7 @@ public class DigVolume : MonoBehaviour
     // protected ground stay. Returns the volume removed (m3). Call Flush() afterwards.
     public float Carve(Vector3 center, float radius, Vector3 axis, float stretch, int shovelLevel)
     {
+        if (center.y > -1.5f) Disturb(center, radius * 1.35f);
         float reach = radius * Mathf.Max(1f, stretch) * (1f + scoopNoise) + Voxel;
         Vector3 lo = (center - Vector3.one * reach - Min) / Voxel, hi = (center + Vector3.one * reach - Min) / Voxel;
         var a = new int3(Mathf.Max(0, Mathf.FloorToInt(lo.x)), Mathf.Max(0, Mathf.FloorToInt(lo.y)), Mathf.Max(0, Mathf.FloorToInt(lo.z)));
@@ -236,6 +251,72 @@ public class DigVolume : MonoBehaviour
             patch = patchCentre, patchRadius = patchRadius, protectedDepth = protectedDepth, removed = removed,
         }.Run();
         float volume = removed[0] * Voxel * Voxel * Voxel;
+        removed.Dispose();
+
+        if (volume > 0f) MarkDirty(a, b);
+        return volume;
+    }
+
+    // Loose earth settling onto the ground: adds a low, rounded mound of `cubicMetres`
+    // around `point`, only where it rests on earth already there (a heap, not a bridge).
+    public void Deposit(Vector3 point, float cubicMetres)
+    {
+        float r = Mathf.Max(Voxel * 0.9f, Mathf.Pow(cubicMetres * 0.75f / Mathf.PI, 1f / 3f) * 1.4f);
+        float reach = r * 1.8f + Voxel;
+        Vector3 lo = (point - new Vector3(reach, r, reach) - Min) / Voxel, hi = (point + new Vector3(reach, r, reach) - Min) / Voxel;
+        var a = new int3(Mathf.Max(1, Mathf.FloorToInt(lo.x)), Mathf.Max(1, Mathf.FloorToInt(lo.y)), Mathf.Max(1, Mathf.FloorToInt(lo.z)));
+        var b = new int3(Mathf.Min(Nx - 2, Mathf.CeilToInt(hi.x)), Mathf.Min(Ny - 2, Mathf.CeilToInt(hi.y)), Mathf.Min(Nz - 2, Mathf.CeilToInt(hi.z)));
+        if (a.x > b.x || a.y > b.y || a.z > b.z) return;
+        new DepositJob { density = density, lo = a, hi = b, min = Min, center = point, radius = r }.Run();
+        if (point.y > -1.5f) Disturb(point, r * 1.8f);
+        MarkDirty(a, b);
+    }
+
+    void Disturb(Vector3 point, float radius)
+    {
+        int x0 = Mathf.Max(0, Mathf.FloorToInt((point.x - radius - Min.x) / Voxel)), x1 = Mathf.Min(Nx - 1, Mathf.CeilToInt((point.x + radius - Min.x) / Voxel));
+        int z0 = Mathf.Max(0, Mathf.FloorToInt((point.z - radius - Min.z) / Voxel)), z1 = Mathf.Min(Nz - 1, Mathf.CeilToInt((point.z + radius - Min.z) / Voxel));
+        for (int z = z0; z <= z1; z++)
+        for (int x = x0; x <= x1; x++)
+        {
+            float d = new Vector2(Min.x + x * Voxel - point.x, Min.z + z * Voxel - point.z).magnitude / radius;
+            if (d >= 1f) continue;
+            byte v = (byte)(Mathf.Clamp01((1f - d) * 2.5f) * 255f);
+            int i = x + Nx * z;
+            if (v > disturbed[i]) { disturbed[i] = v; disturbDirty = true; }
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (!disturbDirty) return;
+        disturbDirty = false;
+        disturbTexture.SetPixelData(disturbed, 0);
+        disturbTexture.Apply(false, false);
+    }
+
+    // Soil must never float. Around a fresh scoop, finds earth that is no longer joined to
+    // the rest of the ground (and thin slivers that could not hold themselves up), removes
+    // it from the field and returns where it was, so it can fall as clods. Returns m3.
+    public float CollapseLoose(Vector3 center, float radius, List<Vector3> fallen)
+    {
+        float reach = radius * 2f + 1.5f;
+        Vector3 lo = (center - Vector3.one * reach - Min) / Voxel, hi = (center + Vector3.one * reach - Min) / Voxel;
+        var a = new int3(Mathf.Max(0, Mathf.FloorToInt(lo.x)), Mathf.Max(0, Mathf.FloorToInt(lo.y)), Mathf.Max(0, Mathf.FloorToInt(lo.z)));
+        var b = new int3(Mathf.Min(Nx - 1, Mathf.CeilToInt(hi.x)), Mathf.Min(Ny - 1, Mathf.CeilToInt(hi.y)), Mathf.Min(Nz - 1, Mathf.CeilToInt(hi.z)));
+        int3 size = b - a + 1;
+        if (math.any(size < 3)) return 0f;
+
+        var state = new NativeArray<byte>(size.x * size.y * size.z, Allocator.TempJob);
+        var queue = new NativeList<int>(1024, Allocator.TempJob);
+        var removed = new NativeList<float3>(64, Allocator.TempJob);
+        new LooseJob { density = density, state = state, queue = queue, removed = removed, lo = a, size = size, min = Min }.Run();
+
+        float volume = removed.Length * Voxel * Voxel * Voxel;
+        if (fallen != null)
+            for (int i = 0; i < removed.Length; i++) fallen.Add(removed[i]);
+        state.Dispose();
+        queue.Dispose();
         removed.Dispose();
 
         if (volume > 0f) MarkDirty(a, b);
@@ -354,6 +435,127 @@ public class DigVolume : MonoBehaviour
     }
 
     // ---- Jobs ----------------------------------------------------------------------
+    // A flattened, slightly lumpy mound. A voxel only fills if earth is below it, so a
+    // heap grows up from the ground and never hangs in the air.
+    [BurstCompile]
+    struct DepositJob : IJob
+    {
+        public NativeArray<float> density;
+        public int3 lo, hi;
+        public float3 min, center;
+        public float radius;
+
+        public void Execute()
+        {
+            for (int z = lo.z; z <= hi.z; z++)
+            for (int x = lo.x; x <= hi.x; x++)
+            for (int y = lo.y; y <= hi.y; y++)   // bottom up, so each layer rests on the last
+            {
+                float3 p = min + new float3(x, y, z) * Voxel;
+                float3 q = p - center;
+                q.y *= 1.8f;
+                float r = radius * (1f + 0.25f * noise.snoise(p * 3.1f));
+                float fill = (r - math.length(q)) / Voxel;
+                if (fill <= -1f) continue;
+                int i = x + Nx * (y + Ny * z);
+                if (density[i - Nx] <= 0f) continue;        // nothing under it
+                density[i] = math.max(density[i], math.min(fill, 1f));
+            }
+        }
+    }
+
+    // Within a box: (1) knock off slivers - earth with air on five or six sides, or a
+    // one-voxel sheet with air above and below; (2) flood-fill the earth from the box's
+    // faces (it continues beyond them, so it is held up); whatever the fill does not reach
+    // is an island floating in the air. Both are turned into air and reported.
+    [BurstCompile]
+    struct LooseJob : IJob
+    {
+        public NativeArray<float> density;
+        public NativeArray<byte> state;          // 0 air, 1 earth, 2 earth that is held up
+        public NativeList<int> queue;
+        public NativeList<float3> removed;
+        public int3 lo, size;
+        public float3 min;
+
+        int Local(int x, int y, int z) { return x + size.x * (y + size.y * z); }
+        int Global(int x, int y, int z) { return (lo.x + x) + Nx * ((lo.y + y) + Ny * (lo.z + z)); }
+
+        bool Air(int x, int y, int z)
+        {
+            if (x < 0 || y < 0 || z < 0 || x >= size.x || y >= size.y || z >= size.z)
+            {
+                int3 g = lo + new int3(x, y, z);
+                if (math.any(g < 0) || g.x >= Nx || g.y >= Ny || g.z >= Nz) return false;   // the edge of the world holds things up
+                return density[g.x + Nx * (g.y + Ny * g.z)] <= 0f;
+            }
+            return state[Local(x, y, z)] == 0;
+        }
+
+        void Remove(int x, int y, int z)
+        {
+            int g = Global(x, y, z);
+            density[g] = math.min(density[g], -0.5f);
+            state[Local(x, y, z)] = 0;
+            removed.Add(min + (float3)(lo + new int3(x, y, z)) * Voxel);
+        }
+
+        public void Execute()
+        {
+            for (int z = 0; z < size.z; z++)
+            for (int y = 0; y < size.y; y++)
+            for (int x = 0; x < size.x; x++)
+                state[Local(x, y, z)] = (byte)(density[Global(x, y, z)] > 0f ? 1 : 0);
+
+            // (1) Slivers, twice: knocking one off can leave another.
+            for (int pass = 0; pass < 2; pass++)
+            for (int z = 1; z < size.z - 1; z++)
+            for (int y = 1; y < size.y - 1; y++)
+            for (int x = 1; x < size.x - 1; x++)
+            {
+                if (state[Local(x, y, z)] == 0) continue;
+                bool below = Air(x, y - 1, z), above = Air(x, y + 1, z);
+                int air = (below ? 1 : 0) + (above ? 1 : 0)
+                        + (Air(x - 1, y, z) ? 1 : 0) + (Air(x + 1, y, z) ? 1 : 0)
+                        + (Air(x, y, z - 1) ? 1 : 0) + (Air(x, y, z + 1) ? 1 : 0);
+                if (air >= 5 || (below && above && air >= 4)) Remove(x, y, z);
+            }
+
+            // (2) Hold up everything joined to the box's faces.
+            for (int z = 0; z < size.z; z++)
+            for (int y = 0; y < size.y; y++)
+            for (int x = 0; x < size.x; x++)
+            {
+                bool face = x == 0 || y == 0 || z == 0 || x == size.x - 1 || y == size.y - 1 || z == size.z - 1;
+                int i = Local(x, y, z);
+                if (face && state[i] == 1) { state[i] = 2; queue.Add(i); }
+            }
+            int head = 0;
+            while (head < queue.Length)
+            {
+                int i = queue[head++];
+                int x = i % size.x, y = i / size.x % size.y, z = i / (size.x * size.y);
+                Visit(x - 1, y, z); Visit(x + 1, y, z);
+                Visit(x, y - 1, z); Visit(x, y + 1, z);
+                Visit(x, y, z - 1); Visit(x, y, z + 1);
+            }
+
+            for (int z = 0; z < size.z; z++)
+            for (int y = 0; y < size.y; y++)
+            for (int x = 0; x < size.x; x++)
+                if (state[Local(x, y, z)] == 1) Remove(x, y, z);
+        }
+
+        void Visit(int x, int y, int z)
+        {
+            if (x < 0 || y < 0 || z < 0 || x >= size.x || y >= size.y || z >= size.z) return;
+            int i = Local(x, y, z);
+            if (state[i] != 1) return;
+            state[i] = 2;
+            queue.Add(i);
+        }
+    }
+
     [BurstCompile]
     struct FillJob : IJobParallelFor
     {

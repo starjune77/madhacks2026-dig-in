@@ -33,12 +33,17 @@ public static partial class DigInSceneBuilder
         var f = new Feel();
         f.shovelController = BuildShovelAnimations();
 
-        f.clodMeshes = new Mesh[4];
+        // Lumps of earth: noisy, squashed, with flat broken faces where they split off.
+        f.clodMeshes = new Mesh[8];
         for (int i = 0; i < f.clodMeshes.Length; i++)
         {
-            int seed = 100 + i * 17;
-            f.clodMeshes[i] = LoadOrCreate(MeshDir + "/Clod " + (char)('A' + i) + ".asset", () => BuildClodMesh(seed));
+            int seed = 300 + i * 23;
+            // The version is in the file name: a new shape gets new files, the old ones are removed.
+            f.clodMeshes[i] = LoadOrCreate(MeshDir + "/Earth Clod v2 " + (char)('A' + i) + ".asset", () => BuildClodMesh(seed));
+            if (AssetDatabase.DeleteAsset(MeshDir + "/Earth Clod " + (char)('A' + i) + ".asset")) report.AppendLine("  deleted an old Earth Clod mesh");
         }
+        foreach (var old in new[] { "A", "B", "C", "D" })
+            if (AssetDatabase.DeleteAsset(MeshDir + "/Clod " + old + ".asset")) report.AppendLine("  deleted the old Clod " + old + " mesh");
 
         f.clodPhysics = LoadOrCreate(MatDir + "/Clod.physicMaterial", () => new PhysicsMaterial("Clod")
         {
@@ -298,14 +303,29 @@ public static partial class DigInSceneBuilder
         }
 
         var rng = new System.Random(seed);
-        var squash = new Vector3(Mathf.Lerp(0.8f, 1.15f, (float)rng.NextDouble()), Mathf.Lerp(0.6f, 0.9f, (float)rng.NextDouble()), Mathf.Lerp(0.8f, 1.15f, (float)rng.NextDouble()));
-        float ox = (float)rng.NextDouble() * 50f, oy = (float)rng.NextDouble() * 50f;
+        float R() => (float)rng.NextDouble();
+        var squash = new Vector3(Mathf.Lerp(0.75f, 1.2f, R()), Mathf.Lerp(0.55f, 0.9f, R()), Mathf.Lerp(0.75f, 1.2f, R()));
+        float ox = R() * 50f, oy = R() * 50f, oz = R() * 50f;
+        float Noise(Vector3 v, float f) =>
+            (Mathf.PerlinNoise(v.x * f + ox, v.y * f + oy) + Mathf.PerlinNoise(v.y * f + oz, v.z * f + ox) + Mathf.PerlinNoise(v.z * f + oy, v.x * f + oz)) / 3f - 0.5f;
         for (int i = 0; i < verts.Count; i++)
         {
             Vector3 v = verts[i];
-            float lump = Mathf.PerlinNoise(v.x * 1.4f + ox, v.y * 1.4f + oy) + Mathf.PerlinNoise(v.z * 1.4f + oy, v.x * 1.4f + ox) - 1f;
-            float fine = Mathf.PerlinNoise(v.y * 4.5f + ox, v.z * 4.5f + oy) - 0.5f;
-            verts[i] = Vector3.Scale(v, squash) * (0.5f * (1f + lump * 0.45f + fine * 0.16f));
+            float r = 1f + Noise(v, 1.3f) * 0.9f + Noise(v, 3.7f) * 0.6f + Noise(v, 9f) * 0.35f;
+            verts[i] = Vector3.Scale(v, squash) * (0.5f * r);
+        }
+
+        // Broken faces: one to three planes the clod split along, pressed nearly flat.
+        int cuts = 2 + rng.Next(3);
+        for (int k = 0; k < cuts; k++)
+        {
+            Vector3 n = new Vector3(R() * 2f - 1f, R() * 2f - 1f, R() * 2f - 1f).normalized;
+            float d = Mathf.Lerp(0.12f, 0.3f, R());
+            for (int i = 0; i < verts.Count; i++)
+            {
+                float over = Vector3.Dot(verts[i], n) - d;
+                if (over > 0f) verts[i] -= n * over * 0.92f;
+            }
         }
 
         // Front faces are clockwise in Unity: make sure the first triangle faces outward.

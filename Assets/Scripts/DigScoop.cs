@@ -33,6 +33,7 @@ public class DigScoop : MonoBehaviour
     }
 
     readonly List<Scoop> active = new List<Scoop>();
+    readonly List<Vector3> fallen = new List<Vector3>();
 
     // `done` is called with (centre, radius, cubic metres removed) once the hole is open.
     public void Begin(Vector3 center, float radius, Vector3 axis, int shovelLevel, int stratum, Action<Vector3, float, float> done)
@@ -59,6 +60,7 @@ public class DigScoop : MonoBehaviour
                 {
                     s.grown = true;
                     settle = true;
+                    s.removed += Collapse(s);
                     debris.Wake(s.center, s.radius * 1.6f);
                     s.done?.Invoke(s.center, s.radius, s.removed);
                     PlanCrumbles(s);
@@ -78,10 +80,23 @@ public class DigScoop : MonoBehaviour
                 }
                 s.rim.RemoveAt(k);
             }
-            if (s.rim.Count == 0) active.RemoveAt(i);
+            if (s.rim.Count == 0)
+            {
+                if (Collapse(s) > 0f) settle = true;
+                active.RemoveAt(i);
+            }
         }
 
         volume.Flush(settle);
+    }
+
+    // Earth left hanging falls.
+    float Collapse(Scoop s)
+    {
+        fallen.Clear();
+        float v = volume.CollapseLoose(s.center, s.radius, fallen);
+        if (fallen.Count > 0) debris.Collapse(fallen, s.stratum);
+        return v;
     }
 
     // A few spots around the rim of the bite, mostly on the side facing the digger and

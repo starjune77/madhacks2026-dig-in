@@ -44,7 +44,7 @@ public static partial class DigInSceneBuilder
     const string BenchVersion = "v2 kenney bench";
     const string HudVersion = "v6 ending layout";
     const string HubVersion = "v3 spawn height";      // marker child of scene/Surface Hub
-    const string DigSiteVersion = "v4 volume";        // marker child of scene/Dig Site
+    const string DigSiteVersion = "v7 heaps";          // marker child of scene/Dig Site
     const string EnvVersion = "v2 backyard";          // marker child of scene/Environment
     const string PageVersion = "v1 page";
 
@@ -221,24 +221,16 @@ public static partial class DigInSceneBuilder
     {
         var m = new Mats();
 
-        // The ground: Assets/Shaders/DigSoil.shader. Its colours are material properties.
-        m.soil = LoadOrCreate(MatDir + "/Dig Soil.mat", () =>
-        {
-            var soil = new Material(Shader.Find("DigIn/Soil"));
-            soil.SetColor("_GrassColor", new Color(0.47f, 0.54f, 0.28f));
-            soil.SetColor("_GrassDark", new Color(0.38f, 0.46f, 0.23f));
-            soil.SetColor("_DirtColor", StrataColors[0]);
-            soil.SetColor("_ClayColor", StrataColors[1]);
-            soil.SetColor("_StoneColor", StrataColors[2]);
-            return soil;
-        });
+        // The ground: Assets/Shaders/DigSoil.shader with photoscanned maps (see SoilMaps).
+        m.soil = LoadOrCreate(MatDir + "/Dig Soil.mat", () => new Material(Shader.Find("DigIn/Soil")));
+        SetUpSoil(m.soil);
 
-        // Loose earth is as matte as the ground it came from.
+        // Loose earth wears the same maps as the ground it came from.
         m.clods = new[]
         {
-            Matte(Mat("Clod Dirt", StrataColors[0] * 0.8f, 0f), StrataColors[0] * 0.8f),
-            Matte(Mat("Clod Clay", StrataColors[1] * 0.8f, 0f), StrataColors[1] * 0.8f),
-            Matte(Mat("Clod Stone", StrataColors[2] * 0.8f, 0f), StrataColors[2] * 0.8f),
+            ClodMaterial("Clod Dirt", DirtFloor, SoilTints[0]),
+            ClodMaterial("Clod Clay", Clay, SoilTints[1]),
+            ClodMaterial("Clod Stone", Stone, SoilTints[2]),
         };
         m.paper = Mat("Card Paper", new Color(0.96f, 0.92f, 0.83f), 0.1f);
         m.frame = Mat("Card Frame", new Color(0.33f, 0.22f, 0.14f), 0.35f);
@@ -1017,6 +1009,7 @@ public static partial class DigInSceneBuilder
 
         var debrisGo = BuildDebris(m, feel);
         debrisGo.transform.SetParent(digSite, false);
+        debrisGo.GetComponent<DigDebris>().volume = volume;
 
         var scoopGo = new GameObject("Scoops");
         scoopGo.transform.SetParent(digSite, false);

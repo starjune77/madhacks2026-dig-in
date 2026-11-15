@@ -22,17 +22,88 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _ClayAO:
+        m_Texture: {fileID: 2800000, guid: 01b99ef65268cc646869afe86d0686b6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ClayDiff:
+        m_Texture: {fileID: 2800000, guid: e5f417edadc35254babde0ed8e0b88a6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ClayNrm:
+        m_Texture: {fileID: 2800000, guid: 851acf1b6ede9ea4f881719b2ec980c8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtFloorAO:
+        m_Texture: {fileID: 2800000, guid: b90dd0f321a651247aea84ee18acf1f2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtFloorDiff:
+        m_Texture: {fileID: 2800000, guid: 05eb4f63e41a4f240810bcfc48dcc50c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtFloorNrm:
+        m_Texture: {fileID: 2800000, guid: a9c4e46d911bc9b4b8a38ea81649391c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtWallAO:
+        m_Texture: {fileID: 2800000, guid: 4827d37f1f5f45642881a8e1262e88d9, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtWallDiff:
+        m_Texture: {fileID: 2800000, guid: 14a40c2d510632542b3330b8b3e7920d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtWallNrm:
+        m_Texture: {fileID: 2800000, guid: e1d8014591f63d44b8e7a06a68516393, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GrassAO:
+        m_Texture: {fileID: 2800000, guid: 665099d1ac2b9c1468247f2f5fc2e11f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GrassDiff:
+        m_Texture: {fileID: 2800000, guid: 5aaae1c51f7406f4eb7b8ded09f6fbc0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GrassNrm:
+        m_Texture: {fileID: 2800000, guid: 1bf731c3f96215f4b982700661cf4349, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _StoneAO:
+        m_Texture: {fileID: 2800000, guid: edf9b085a52df7a4e894ac898c58035d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _StoneDiff:
+        m_Texture: {fileID: 2800000, guid: 9b90df80fe1b79540a2deb14ed2ac1c8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _StoneNrm:
+        m_Texture: {fileID: 2800000, guid: 98bb0f0cc91c4054aafae9c015fcab55, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AOStrength: 0.8
+    - _ClayScale: 0.5
+    - _DirtScale: 0.55
+    - _GrassScale: 0.5
+    - _Macro: 0.25
     - _Moist: 0.28
     - _Mottle: 0.35
+    - _NormalStrength: 1
+    - _StoneScale: 0.4
     m_Colors:
     - _ClayColor: {r: 0.5, g: 0.29, b: 0.19, a: 1}
+    - _ClayTint: {r: 1.1, g: 0.86, b: 0.74, a: 1}
     - _DirtColor: {r: 0.36, g: 0.25, b: 0.16, a: 1}
+    - _DirtTint: {r: 0.98, g: 0.92, b: 0.86, a: 1}
     - _GrassColor: {r: 0.47, g: 0.54, b: 0.28, a: 1}
     - _GrassDark: {r: 0.38, g: 0.46, b: 0.23, a: 1}
+    - _GrassTint: {r: 0.95, g: 1, b: 0.82, a: 1}
     - _StoneColor: {r: 0.34, g: 0.33, b: 0.34, a: 1}
+    - _StoneTint: {r: 0.86, g: 0.86, b: 0.88, a: 1}
     - _WarmTint: {r: 1.22, g: 1.06, b: 0.82, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

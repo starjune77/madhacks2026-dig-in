@@ -1,21 +1,52 @@
-// The ground of the dig volume. World-space (the mesh has no UVs), fully matte.
+// The ground of the dig volume: photoscanned soil, clay and rock (Poly Haven, CC0),
+// projected triplanar in world space (the mesh has no UVs), fully matte.
 //   - Grass on the untouched surface, bare earth in the starting hollow.
-//   - Below: strata by depth (dirt, clay, stone), with the same wobble DigVolume uses
-//     for hardness, so what looks like stone is stone.
-//   - Warmer and a little lighter near the hidden life path.
+//   - Below: strata by depth (dirt, clay, stone) with the same wobble DigVolume uses for
+//     hardness, so what looks like stone is stone. Walls show compact earth, floors loose.
+//   - Freshly dug earth is darker and a little richer in colour than the dry top.
+//   - Warmer near the hidden life path.
 // Globals (_Dig...) are set by DigVolume at start.
 Shader "DigIn/Soil"
 {
     Properties
     {
-        _GrassColor("Grass", Color) = (0.30, 0.36, 0.16, 1)
-        _GrassDark("Grass (dark patches)", Color) = (0.20, 0.27, 0.11, 1)
-        _DirtColor("Dirt (Childhood)", Color) = (0.36, 0.25, 0.16, 1)
-        _ClayColor("Clay (School Days)", Color) = (0.50, 0.29, 0.19, 1)
-        _StoneColor("Stone (Growing Up)", Color) = (0.34, 0.33, 0.34, 1)
-        _WarmTint("Tint near the life path", Color) = (1.22, 1.06, 0.82, 1)
-        _Moist("Darkening of dug surfaces", Range(0, 1)) = 0.28
-        _Mottle("Mottling strength", Range(0, 1)) = 0.35
+        [Header(Dirt (Childhood))]
+        _DirtWallDiff("Wall colour", 2D) = "grey" {}
+        [NoScaleOffset][Normal] _DirtWallNrm("Wall normal", 2D) = "bump" {}
+        [NoScaleOffset] _DirtWallAO("Wall AO", 2D) = "white" {}
+        [NoScaleOffset] _DirtFloorDiff("Floor colour", 2D) = "grey" {}
+        [NoScaleOffset][Normal] _DirtFloorNrm("Floor normal", 2D) = "bump" {}
+        [NoScaleOffset] _DirtFloorAO("Floor AO", 2D) = "white" {}
+        _DirtTint("Dirt tint", Color) = (1, 1, 1, 1)
+        _DirtScale("Dirt tiles per metre", Float) = 0.55
+
+        [Header(Clay (School Days))]
+        [NoScaleOffset] _ClayDiff("Colour", 2D) = "grey" {}
+        [NoScaleOffset][Normal] _ClayNrm("Normal", 2D) = "bump" {}
+        [NoScaleOffset] _ClayAO("AO", 2D) = "white" {}
+        _ClayTint("Clay tint", Color) = (1, 1, 1, 1)
+        _ClayScale("Clay tiles per metre", Float) = 0.5
+
+        [Header(Stone (Growing Up))]
+        [NoScaleOffset] _StoneDiff("Colour", 2D) = "grey" {}
+        [NoScaleOffset][Normal] _StoneNrm("Normal", 2D) = "bump" {}
+        [NoScaleOffset] _StoneAO("AO", 2D) = "white" {}
+        _StoneTint("Stone tint", Color) = (1, 1, 1, 1)
+        _StoneScale("Stone tiles per metre", Float) = 0.4
+
+        [Header(Grass)]
+        [NoScaleOffset] _GrassDiff("Colour", 2D) = "grey" {}
+        [NoScaleOffset][Normal] _GrassNrm("Normal", 2D) = "bump" {}
+        [NoScaleOffset] _GrassAO("AO", 2D) = "white" {}
+        _GrassTint("Grass tint", Color) = (1, 1, 1, 1)
+        _GrassScale("Grass tiles per metre", Float) = 0.5
+
+        [Header(Look)]
+        _NormalStrength("Normal strength", Range(0, 2)) = 1
+        _AOStrength("AO strength", Range(0, 1)) = 0.8
+        _WarmTint("Tint near the life path", Color) = (1.15, 1.04, 0.86, 1)
+        _Moist("Darkening of dug earth", Range(0, 1)) = 0.22
+        _Macro("Large-scale variation", Range(0, 1)) = 0.25
     }
 
     SubShader
@@ -26,45 +57,11 @@ Shader "DigIn/Soil"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
         CBUFFER_START(UnityPerMaterial)
-            half4 _GrassColor;
-            half4 _GrassDark;
-            half4 _DirtColor;
-            half4 _ClayColor;
-            half4 _StoneColor;
-            half4 _WarmTint;
-            half _Moist;
-            half _Mottle;
+            float4 _DirtWallDiff_ST;
+            half4 _DirtTint, _ClayTint, _StoneTint, _GrassTint, _WarmTint;
+            float _DirtScale, _ClayScale, _StoneScale, _GrassScale;
+            half _NormalStrength, _AOStrength, _Moist, _Macro;
         CBUFFER_END
-
-        TEXTURE3D(_DigPathTex);     SAMPLER(sampler_DigPathTex);
-        TEXTURE2D(_DigWobbleTex);   SAMPLER(sampler_DigWobbleTex);
-        float4 _DigVolumeMin;       // xyz = min corner
-        float4 _DigVolumeSize;      // xyz = size
-        float4 _DigStrata;          // x, y = depth of the two stratum boundaries
-        float4 _DigStart;           // xyz = the starting hollow, w = radius of bare earth
-
-        float Hash3(float3 p)
-        {
-            p = frac(p * 0.3183099 + 0.1);
-            p *= 17.0;
-            return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
-        }
-
-        float Noise3(float3 x)
-        {
-            float3 i = floor(x);
-            float3 f = frac(x);
-            f = f * f * (3.0 - 2.0 * f);
-            return lerp(lerp(lerp(Hash3(i + float3(0, 0, 0)), Hash3(i + float3(1, 0, 0)), f.x),
-                             lerp(Hash3(i + float3(0, 1, 0)), Hash3(i + float3(1, 1, 0)), f.x), f.y),
-                        lerp(lerp(Hash3(i + float3(0, 0, 1)), Hash3(i + float3(1, 0, 1)), f.x),
-                             lerp(Hash3(i + float3(0, 1, 1)), Hash3(i + float3(1, 1, 1)), f.x), f.y), f.z);
-        }
-
-        float Fbm(float3 p)
-        {
-            return Noise3(p) * 0.5 + Noise3(p * 2.3 + 7.1) * 0.3 + Noise3(p * 5.9 + 3.3) * 0.2;
-        }
         ENDHLSL
 
         Pass
@@ -94,6 +91,23 @@ Shader "DigIn/Soil"
             #define _ENVIRONMENTREFLECTIONS_OFF 1
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "DigTriplanar.hlsl"
+
+            TEXTURE2D(_DirtWallDiff);  SAMPLER(sampler_DirtWallDiff);
+            TEXTURE2D(_DirtWallNrm);   TEXTURE2D(_DirtWallAO);
+            TEXTURE2D(_DirtFloorDiff); TEXTURE2D(_DirtFloorNrm); TEXTURE2D(_DirtFloorAO);
+            TEXTURE2D(_ClayDiff);      TEXTURE2D(_ClayNrm);      TEXTURE2D(_ClayAO);
+            TEXTURE2D(_StoneDiff);     TEXTURE2D(_StoneNrm);     TEXTURE2D(_StoneAO);
+            TEXTURE2D(_GrassDiff);     TEXTURE2D(_GrassNrm);     TEXTURE2D(_GrassAO);
+            #define SAMP sampler_DirtWallDiff
+
+            TEXTURE3D(_DigPathTex);     SAMPLER(sampler_DigPathTex);
+            TEXTURE2D(_DigWobbleTex);   SAMPLER(sampler_DigWobbleTex);
+            TEXTURE2D(_DigDisturbTex);
+            float4 _DigVolumeMin;       // xyz = min corner
+            float4 _DigVolumeSize;      // xyz = size
+            float4 _DigStrata;          // x, y = depth of the two stratum boundaries
+            float4 _DigStart;           // xyz = the starting hollow, w = radius of bare earth
 
             struct Attributes
             {
@@ -137,37 +151,88 @@ Shader "DigIn/Soil"
                 float3 uvw = (p - _DigVolumeMin.xyz) / _DigVolumeSize.xyz;
                 float wobble = SAMPLE_TEXTURE2D(_DigWobbleTex, sampler_DigWobbleTex, uvw.xz).r;
                 float depth = -p.y + wobble;
-                float ragged = (Fbm(p * 1.3) - 0.5) * 0.5;
+                float ragged = (DigFbm(p * 1.3) - 0.5) * 0.5;
+                half clay = smoothstep(-0.25, 0.25, depth + ragged - _DigStrata.x);
+                half stone = smoothstep(-0.25, 0.25, depth + ragged - _DigStrata.y);
 
-                half3 soil = _DirtColor.rgb;
-                soil = lerp(soil, _ClayColor.rgb, smoothstep(-0.25, 0.25, depth + ragged - _DigStrata.x));
-                soil = lerp(soil, _StoneColor.rgb, smoothstep(-0.25, 0.25, depth + ragged - _DigStrata.y));
+                // Grass on the untouched top; bare earth in the starting hollow.
+                float bare = 1.0 - smoothstep(_DigStart.w * 0.55, _DigStart.w, distance(p.xz, _DigStart.xz) + (DigFbm(p * 1.7) - 0.5) * 1.2);
+                half top = smoothstep(0.55, 0.8, n.y) * smoothstep(-0.30, -0.10, p.y + (DigNoise3(p * 4.0) - 0.5) * 0.1);
+                half disturbed = SAMPLE_TEXTURE2D(_DigDisturbTex, sampler_DigWobbleTex, uvw.xz).r;
+                disturbed = saturate(disturbed + (DigNoise3(p * 3.0) - 0.5) * 0.6 * disturbed);
+                half grass = top * (1.0 - bare) * (1.0 - disturbed);
 
-                // Layered earth: faint horizontal bands, plus clumpy mottling.
-                float band = Noise3(float3(p.x * 0.15, p.y * 3.1, p.z * 0.15)) - 0.5;
-                float mottle = Fbm(p * 3.7) - 0.5;
-                float grit = Noise3(p * 23.0) - 0.5;
-                soil *= 1.0 + band * 0.22 + mottle * _Mottle + grit * 0.10;
+                // ---- Sample only what is visible here ---------------------------
+                TriSample soil;
+                if (stone < 0.99)
+                {
+                    if (clay < 0.99)
+                    {
+                        TriCoords t = MakeTriCoords(p, n, _DirtScale, 4);
+                        soil = SampleTri(TEXTURE2D_ARGS(_DirtWallDiff, SAMP), TEXTURE2D_ARGS(_DirtWallNrm, SAMP), TEXTURE2D_ARGS(_DirtWallAO, SAMP),
+                                         TEXTURE2D_ARGS(_DirtFloorDiff, SAMP), TEXTURE2D_ARGS(_DirtFloorNrm, SAMP), TEXTURE2D_ARGS(_DirtFloorAO, SAMP), t, _NormalStrength);
+                        soil.albedo *= _DirtTint.rgb;
+                        if (clay > 0.01)
+                        {
+                            TriCoords tc = MakeTriCoords(p, n, _ClayScale, 4);
+                            TriSample c = SampleTri(TEXTURE2D_ARGS(_ClayDiff, SAMP), TEXTURE2D_ARGS(_ClayNrm, SAMP), TEXTURE2D_ARGS(_ClayAO, SAMP),
+                                                    TEXTURE2D_ARGS(_ClayDiff, SAMP), TEXTURE2D_ARGS(_ClayNrm, SAMP), TEXTURE2D_ARGS(_ClayAO, SAMP), tc, _NormalStrength);
+                            c.albedo *= _ClayTint.rgb;
+                            soil = LerpSample(soil, c, clay);
+                        }
+                    }
+                    else
+                    {
+                        TriCoords tc = MakeTriCoords(p, n, _ClayScale, 4);
+                        soil = SampleTri(TEXTURE2D_ARGS(_ClayDiff, SAMP), TEXTURE2D_ARGS(_ClayNrm, SAMP), TEXTURE2D_ARGS(_ClayAO, SAMP),
+                                         TEXTURE2D_ARGS(_ClayDiff, SAMP), TEXTURE2D_ARGS(_ClayNrm, SAMP), TEXTURE2D_ARGS(_ClayAO, SAMP), tc, _NormalStrength);
+                        soil.albedo *= _ClayTint.rgb;
+                    }
+                    if (stone > 0.01)
+                    {
+                        TriCoords ts = MakeTriCoords(p, n, _StoneScale, 4);
+                        TriSample s = SampleTri(TEXTURE2D_ARGS(_StoneDiff, SAMP), TEXTURE2D_ARGS(_StoneNrm, SAMP), TEXTURE2D_ARGS(_StoneAO, SAMP),
+                                                TEXTURE2D_ARGS(_StoneDiff, SAMP), TEXTURE2D_ARGS(_StoneNrm, SAMP), TEXTURE2D_ARGS(_StoneAO, SAMP), ts, _NormalStrength);
+                        s.albedo *= _StoneTint.rgb;
+                        soil = LerpSample(soil, s, stone);
+                    }
+                }
+                else
+                {
+                    TriCoords ts = MakeTriCoords(p, n, _StoneScale, 4);
+                    soil = SampleTri(TEXTURE2D_ARGS(_StoneDiff, SAMP), TEXTURE2D_ARGS(_StoneNrm, SAMP), TEXTURE2D_ARGS(_StoneAO, SAMP),
+                                     TEXTURE2D_ARGS(_StoneDiff, SAMP), TEXTURE2D_ARGS(_StoneNrm, SAMP), TEXTURE2D_ARGS(_StoneAO, SAMP), ts, _NormalStrength);
+                    soil.albedo *= _StoneTint.rgb;
+                }
+
+                // Large patches of lighter and darker earth, so the tiling never shows.
+                soil.albedo *= 1.0 + (DigFbm(p * 0.35 + 5.0) - 0.5) * 2.0 * _Macro;
 
                 // Softer, warmer earth along the life path.
                 half warm = SAMPLE_TEXTURE3D(_DigPathTex, sampler_DigPathTex, uvw).r;
-                warm = saturate(warm + (Fbm(p * 0.9 + 11.0) - 0.5) * 0.35) * warm;
-                soil = lerp(soil, soil * _WarmTint.rgb, warm);
+                warm = saturate(warm + (DigFbm(p * 0.9 + 11.0) - 0.5) * 0.35) * warm;
+                soil.albedo = lerp(soil.albedo, soil.albedo * _WarmTint.rgb, warm);
 
-                // Grass on the untouched top; bare earth in the starting hollow.
-                float bare = 1.0 - smoothstep(_DigStart.w * 0.55, _DigStart.w, distance(p.xz, _DigStart.xz) + (Fbm(p * 1.7) - 0.5) * 1.2);
-                float top = smoothstep(0.55, 0.8, n.y) * smoothstep(-0.30, -0.10, p.y + (Noise3(p * 4.0) - 0.5) * 0.1);
-                float grass = top * (1.0 - bare);
-                half3 grassColor = lerp(_GrassDark.rgb, _GrassColor.rgb, Fbm(p * 0.6 + 3.0));
-                grassColor *= 0.9 + 0.2 * Noise3(p * 19.0);
+                // Dug earth is moist: darker, a touch richer. The untouched top stays dry.
+                half dug = 1.0 - top * bare * (1.0 - disturbed);
+                half3 moist = soil.albedo * (1.0 - _Moist);
+                moist = lerp(dot(moist, half3(0.3, 0.59, 0.11)).xxx, moist, 1.12);
+                soil.albedo = lerp(soil.albedo, moist, dug);
 
-                // Dug surfaces are darker and moister than the dry top.
-                half3 albedo = lerp(soil * (1.0 - _Moist * (1.0 - top * bare)), grassColor, grass);
+                TriSample surface = soil;
+                if (grass > 0.01)
+                {
+                    TriCoords tg = MakeTriCoords(p, n, _GrassScale, 8);
+                    TriSample g = SampleTri(TEXTURE2D_ARGS(_GrassDiff, SAMP), TEXTURE2D_ARGS(_GrassNrm, SAMP), TEXTURE2D_ARGS(_GrassAO, SAMP),
+                                            TEXTURE2D_ARGS(_GrassDiff, SAMP), TEXTURE2D_ARGS(_GrassNrm, SAMP), TEXTURE2D_ARGS(_GrassAO, SAMP), tg, _NormalStrength);
+                    g.albedo *= _GrassTint.rgb * (1.0 + (DigFbm(p * 0.25 + 3.0) - 0.5) * 0.5);
+                    surface = LerpSample(soil, g, grass);
+                }
 
                 // ---- Lighting ---------------------------------------------------
                 InputData inputData = (InputData)0;
                 inputData.positionWS = p;
-                inputData.normalWS = n;
+                inputData.normalWS = surface.normal;
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(p);
             #if defined(MAIN_LIGHT_CALCULATE_SHADOWS)
                 inputData.shadowCoord = TransformWorldToShadowCoord(p);
@@ -176,17 +241,17 @@ Shader "DigIn/Soil"
             #endif
                 inputData.fogCoord = InitializeInputDataFog(float4(p, 1.0), input.fogFactor);
                 inputData.vertexLighting = half3(0, 0, 0);
-                inputData.bakedGI = SampleSH(n);
+                inputData.bakedGI = SampleSH(surface.normal);
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
                 inputData.shadowMask = half4(1, 1, 1, 1);
 
                 SurfaceData surfaceData = (SurfaceData)0;
-                surfaceData.albedo = albedo;
+                surfaceData.albedo = surface.albedo;
                 surfaceData.metallic = 0;
                 surfaceData.specular = half3(0, 0, 0);
                 surfaceData.smoothness = 0;
                 surfaceData.normalTS = half3(0, 0, 1);
-                surfaceData.occlusion = 1;
+                surfaceData.occlusion = lerp(1.0, surface.ao, _AOStrength);
                 surfaceData.alpha = 1;
 
                 half4 color = UniversalFragmentPBR(inputData, surfaceData);

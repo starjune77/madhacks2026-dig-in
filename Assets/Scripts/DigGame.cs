@@ -218,6 +218,7 @@ public class DigGame : MonoBehaviour
     MemoryFind Unearth(MemoryFind prefab, MemoryData data, Vector3 spot)
     {
         volume.Carve(spot + Vector3.up * 0.15f, 0.45f, Vector3.down, 1f, 99);
+        volume.CollapseLoose(spot, 0.45f, null);
         volume.Flush(true);
         debris.Crumble(spot + Vector3.up * 0.2f, volume.StratumAt(spot));
         var find = Instantiate(prefab, spot, Quaternion.identity);

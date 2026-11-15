@@ -16,37 +16,46 @@ A first-person 3D digging game for MadHacks 2026. Solo developer.
 
 You dig into the backyard with an old shovel and unearth objects from ordinary moments you once passed by without noticing. The dig is not a shaft: it winds, like a life. The very end of it is "today".
 
+Underneath, the world is not quite the real one. It is a dream, or something like it, in which the protagonist digs into their own life. The family cat, their real pet, somehow runs the shop here.
+
 ## Locked design decisions (do not change)
 
 - **Free 3D digging.** The ground is smooth volumetric soil; the player digs down, sideways and through curving tunnels. No shaft, no frame, no walls. The dig starts as a slight hollow in the backyard grass.
+- **Soil behaves like soil.** It never floats: earth cut loose from the ground falls as clods. Clods are crumbly, irregular earth in the ground's own material, some breaking apart when they land; tossed earth settles into real heaps on the yard.
 - **A hidden life path.** The story lies along a hidden 3D spline, 60-80 m long, that descends while wandering: sometimes steep, sometimes nearly level, curving left and right. Target 25-35 minutes of play.
 - **Soft guidance only.** Along the path the soil is softer and warmer in colour, with roots, small glints and a faint warm light ahead. Off the path the soil is denser and slower to dig. No arrows, no markers, no walls.
 - Earlier on the path = childhood. Further = school days, then growing up. The ground gets harder as you go.
 - Three strata, by depth: Childhood (soft warm dirt) -> School Days (clay) -> Growing Up (stone). "Today" is at the end of the path.
-- Three shovels: Toy Shovel -> Garden Shovel -> Steel Shovel. Each stratum requires the next shovel.
-- One resource only: scrap. You find it while digging and spend it on shovel upgrades. No coin economy.
+- **Economy: dig -> find minerals -> carry them up -> sell at the shop -> buy upgrades.** 15-20 real mineral types (quartz, feldspar, mica, garnet, jasper, malachite, amethyst, opal...) with rarity and value by depth and stratum, embedded in the walls, popping out when dug, with a small glint. Each has a one-line description that quietly echoes a moment of life ("Quartz: clear, like the mornings before school."), subtle, never preachy.
+- A bag with limited capacity, so the player goes back up to sell. R takes you up and back down.
+- Shop upgrades: 4-5 shovel tiers (each faster and able to dig harder strata), bag capacity, a brighter lantern. Prices tuned so the full journey takes 25-35 minutes.
+- **The shop is run by a cat**: the protagonist's own pet, a real cat shape (not humanoid), small and round, warm colours, sitting on a counter or crate near the house. Realistic but soft. Idle, tail swish, blink and purr/stretch animations. The shop UI is simple and warm, like a hand-written price board; the cat says short lines when you sell or buy.
+- Memories, fragments and letters are never sold.
 - Nine major memory objects, three per stratum, at fixed points on the path (not random) so the demo is reproducible. Between them, 15-20 small memory fragments (a marble, a bottle cap, a hair tie, a bus pass...), each with one short line in the same quiet tone. A few small open pockets along the way, each holding something.
 - Picking up a major object shows a card with its illustration and a one-line memory. A fragment only shows its line.
 - One letter per stratum (three total). A shelf at the surface fills up with the cards you have found.
-- Ending: at the end of the path you find a blank page. The ending text appears, you return to the surface, and the shelf is full. No extra explanatory dialogue.
+- **The dream frame**, hinted softly and never stated until the end: the yard feels familiar but slightly unreal, no other people exist, the light is a little too golden, the cat sometimes says things a cat could not know.
+- Ending: at the end of the path you find a blank page. The ending text appears, you return to the surface, and the shelf is full. How the dream frame and the cat pay off at the end is **not decided yet**: two options will be proposed, and nothing changes until the developer chooses.
 - The shovel is only a tool for going further. The real reward is the memories.
 - The game starts like an ordinary digging game. The meaning should dawn on the player gradually.
-- **Realistic art direction**: photoreal materials and models, but warm, calm and nostalgic (golden hour, soft haze, warm grade). Never cold or gritty. No low-poly assets; do not mix styles.
-- Out of scope: third-person view, pets, Databricks integration, complex inventory.
+- **Realistic art direction**: photoreal quality close to modern realistic indie simulator games, warm, calm and nostalgic (golden hour, soft haze, warm grade). Never cold or gritty. No low-poly assets anywhere; do not mix styles. Every Kenney asset leaves the scene.
+- **Sound**: natural, soft and gentle; recorded foley, never synthetic or procedural; a quiet, calm mix.
+- Out: scrap, the workbench, the Kenney low-poly look. Also out of scope: third-person view, Databricks integration, complex inventory.
 
-## Overhaul plan (2026-11-14, branch `overhaul`)
+## Plan (2026-11-14 evening, branch `overhaul`)
 
-The low-poly, straight-shaft version was play-tested and rejected: soil like shiny cement, stiff digging, a boxy shaft, a cheap look, far too short. References for feel, guidance and mood (ideas only, never assets or exact designs): A Game About Digging A Hole, Astroneer, What Remains of Edith Finch, modern simulator games with physical piles of small objects.
+The low-poly, straight-shaft version was play-tested and rejected; so was the first overhaul's floating soil and pebble-like clods. References for feel, guidance and mood (ideas only, never assets or exact designs): A Game About Digging A Hole, Astroneer, What Remains of Edith Finch, modern simulator games with physical piles of small objects.
 
-Order, one commit per working step, Play mode screenshots checked after each:
+Already done on `overhaul`: volumetric terrain (density field, marching cubes, Burst, a collider per chunk), the life path, the animated swing with hit-stop, scoops that grow and crumble, the aim ring.
 
-1. **Terrain** - chunked density field, marching cubes, Burst jobs, a collider per chunk. `[done]`
-2. **Digging feel** (top priority) - animation-clip swing with anticipation, impact, follow-through; ~40 ms hit-stop; soft camera kick; the scoop forms over a short tween and crumbles at its edges; physical clods and crumbs that pile up; dust puffs; hold-to-dig rhythm; a subtle preview of the next scoop; smooth movement. **Stop here for a developer play-test.** `[in progress]`
-3. **Soil materials** - CC0 photoscanned PBR soil, clay and rock (Poly Haven / ambientCG, 2K), triplanar, fully matte, blended by stratum; dug surfaces darker and moister, with pebbles and roots.
-4. **Sky, light and mood** - Evening Field HDRI as visible sky and lighting, height fog, soft shadows, SSAO, soft bloom, depth of field, warm filmic grade, subtle grain and vignette, dust motes; cozy lantern underground.
-5. **Environment** - realistic house, fence, trees, grass, rocks (Poly Haven models, free Asset Store packs the developer imports). Remove every Kenney asset.
-6. **Life path and content** - the final spline, softness and warmth guidance, pockets, 15-20 fragments, pacing for 25-35 minutes.
-7. **Shovel and memory objects** - realistic Meshy shovel (one first, for approval), gloved hands if feasible, then the memory objects. The Bicycle Bell is regenerated in the realistic style once the terrain works.
+Order. Screenshot and check after each step, commit after each working step, **stop for a developer play-test after steps 1, 2 and 4**:
+
+1. **Soil** - no floating soil (islands and slivers collapse into falling clods); crumbly clods in the ground's material that break on landing and settle into heaps; photoscanned CC0 soil, clay and rock, triplanar, matte, blended by stratum, dug earth darker and moister. `[done, awaiting play-test]`
+2. **Realistic graphics** - first one vista (the view from the spawn point across the backyard), then stop for approval; then the dig area, tunnels and shop corner. HDRI sky and light, Unity Terrain with photoscanned layers and dense grass, realistic trees, rocks and props (Poly Haven, Meshy realistic, free Asset Store packs the developer imports), every Kenney asset removed, full post-processing.
+3. **Economy** - minerals, bag, money, the shop and its upgrades replace scrap and the workbench.
+4. **The cat shopkeeper** - Meshy, rigged quadruped, idle animations; show the cat before anything else is generated. Then stop.
+5. **Sound** - CC0 / royalty-free recorded foley, sources and licences in CREDITS.md.
+6. **Dream hints** in the world and the cat's lines, and **two ending options** for the developer to choose from (not implemented until chosen).
 
 Performance budget: 60 fps at 1080p on the developer's laptop. Check frame time in Play mode after each visual change and report anything heavy. Repo size: 2K textures, never 4K or 8K.
 
@@ -55,7 +64,7 @@ Performance budget: 60 fps at 1080p on the developer's laptop. Check frame time 
 - **Assets over code. Code draws only what must be procedural.** Code generates only the diggable volume (density field, chunk meshes and colliders), the debris pool, the scoop preview and runtime state. Everything else (environment, props, shovel, player, hub, UI, lighting, animation clips, particle systems) is real Unity content: GameObjects saved in SampleScene, prefabs, materials, textures and clips in `Assets/`, UI as a UGUI Canvas, all editable in the editor. Runtime code references them through serialized fields and never creates them.
 - Persistent content is created by the editor script `Assets/Editor/DigInSceneBuilder*.cs` (menu **DigIn > Build Scene**). It only creates what is missing, so re-running is safe; to regenerate a piece, delete it and run again. Prefabs and versioned scene objects carry a version marker child (e.g. "v2 bookcase"); bumping the version constant rebuilds that piece. New content goes into that script, not into runtime code.
 - Models are placed by their measured bounds (`Place`, `FitInside`, `Edge` helpers), never by assumed sizes: packs use different units and pivots.
-- **No sound** until the developer asks for it. Do not add any audio, procedural or files.
+- **Sound** is recorded foley only (CC0 from Freesound with the CC0 filter, Kenney audio, or royalty-free packs that allow commercial use), never procedural. Slight random pitch and volume on repeated sounds; surface ambience is muffled underground with a low-pass filter; keep the mix quiet. Every source and licence goes in `CREDITS.md`.
 - First-person actions (shovel swing, dirt impact, object popping out, card reveal) use Unity animation assets where that makes sense.
 - Use only the new Input System (`Keyboard.current`, `Mouse.current`). The legacy `Input` class throws errors in this project.
 - Never call `Shader.Find` at runtime (shaders can be stripped from builds). In editor scripts it is fine, because the saved material asset keeps a hard reference to its shader.
@@ -69,6 +78,7 @@ Performance budget: 60 fps at 1080p on the developer's laptop. Check frame time 
 Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline package `com.unity.pipeline`).
 
 - **After every visual change, enter Play mode, take screenshots, look at them, and fix problems before reporting to the developer. Read the Console after every change.**
+- Every third-party asset (textures, models, sounds) is listed with its source and licence in `CREDITS.md` when it is added.
 - Build Scene: `unity command script eval -- --code 'DigInSceneBuilder.BuildSceneUnattended(); return 1;'` (never use `BuildScene()` from automation: it can open a save prompt that blocks the Editor). Screenshots: `unity command capture game_view -- --source screen --output-path <absolute path outside the repo>`.
 - Run `unity` from Git Bash, not PowerShell 5.1 (it strips the quotes inside C# snippets).
 - Simulated keys and clicks do not reach the game while the Editor window is in the background. Drive the game through its public methods instead (`DigGame.I.DemoJump(n)`, `DemoEnding()`, `DigGame.I.Dig(...)`, `TryPickUp`, `player.Teleport` / `SetLook`), and ask the developer to check anything that needs real input.
