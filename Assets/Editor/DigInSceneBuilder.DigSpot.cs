@@ -12,7 +12,7 @@ using UnityEngine;
 // (DigLoosen), so they never float. Poly Haven models (CC0).
 public static partial class DigInSceneBuilder
 {
-    const string DigSpotVersion = "v5 light flowers";
+    const string DigSpotVersion = "v6 old spade";
 
     static GameObject BuildDigSpot()
     {
@@ -63,16 +63,22 @@ public static partial class DigInSceneBuilder
             }
         }
 
-        // ---- A garden trowel stuck in the dirt -------------------------------------------------
-        var trowel = PolyHavenAsset("trowel_01");
-        if (trowel != null)
+        // ---- The old spade, stuck upright in the soil, waiting to be taken ---------------------
+        var spadeAsset = MeshyAsset("Spade", 0.3f);
+        if (spadeAsset != null)
         {
-            var go = PlaceAsset(t, trowel, OnGround(DigStart.x - 0.9f, DigStart.y - 1.1f), 0f, width: 0.3f);
-            // Lay it along Z, then stand it on its tip, leaning back, blade in the soil.
-            go.transform.rotation = Quaternion.Euler(-62f, 200f, 8f) * Quaternion.FromToRotation(LongAxis(go), Vector3.forward);
-            var b = WorldBounds(go);
-            go.transform.position += new Vector3(0f, OnGround(DigStart.x - 0.9f, DigStart.y - 1.1f).y - b.min.y - b.size.y * 0.28f, 0f);
-            Loosen(go, debris);
+            const float length = 0.95f, sunk = 0.22f;
+            var root = new GameObject("Old Spade");
+            root.transform.SetParent(t, false);
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(spadeAsset, root.transform);
+            var b = LocalBounds(root.transform);
+            model.transform.localScale *= length / Mathf.Max(0.001f, b.size.y);   // the model stands blade down
+            b = LocalBounds(root.transform);
+            model.transform.localPosition -= new Vector3(b.center.x, b.min.y, b.center.z);
+            root.transform.position = OnGround(DigStart.x - 0.9f, DigStart.y - 1.1f) - Vector3.up * sunk;
+            root.transform.rotation = Quaternion.Euler(5f, 25f, -6f);   // leaning a little, as if left mid-dig
+            var ws = root.AddComponent<DigWorldSpade>();
+            ws.length = length;
         }
 
         // ---- The lure: a pool of warm light and a glint in the soil ---------------------------

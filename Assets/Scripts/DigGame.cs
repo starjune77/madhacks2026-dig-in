@@ -32,6 +32,9 @@ public class DigGame : MonoBehaviour
     public DigPause pause;
     [Tooltip("The cat on the counter (petting).")]
     public DigCat shopCat;
+    [Tooltip("The old spade stuck in the soil at the dig spot; you start empty-handed.")]
+    public DigWorldSpade worldSpade;
+    public bool HasSpade => shovel.Held;
     public DigMinerals minerals;
     public DigAtmosphere atmosphere;
     [Tooltip("The shop counter: walk up to it and press E.")]
@@ -109,8 +112,19 @@ public class DigGame : MonoBehaviour
     void Start()
     {
         shovel.SetLevel(shovelLevel);
+        shovel.SetHeld(worldSpade == null);   // empty-handed while the spade waits in the soil
         ReturnToSurface();
     }
+
+    // The spade comes to your hands (taken from the soil, or given by demo mode).
+    public void GiveSpade()
+    {
+        shovel.SetHeld(true);
+        if (worldSpade != null && worldSpade.gameObject.activeSelf && !worldSpade.Taking) worldSpade.gameObject.SetActive(false);
+    }
+
+    bool LookingAtSpade() =>
+        !HasSpade && worldSpade != null && worldSpade.AimedBy(new Ray(player.cam.position, player.cam.forward), player.reach + 0.4f);
 
     // ---- Digging ------------------------------------------------------------
     // How big a scoop is here: full size in the soft soil of the life path, smaller in
@@ -328,6 +342,7 @@ public class DigGame : MonoBehaviour
     // In front of the cat's counter with a bag of stones to sell.
     public void DemoShop()
     {
+        GiveSpade();
         ReturnToSurface();
         bag.Clear();
         if (minerals != null && minerals.kinds.Length > 0)
@@ -375,6 +390,7 @@ public class DigGame : MonoBehaviour
     {
         shovelLevel = Mathf.Clamp(level, 0, shovelRadius.Length - 1);
         shovel.SetLevel(shovelLevel);
+        GiveSpade();   // demo jumps hand you the spade
     }
 
     void SkipMemoriesBefore(float distance)
@@ -459,6 +475,12 @@ public class DigGame : MonoBehaviour
     public void Interact()
     {
         if (PickUpMineral()) return;   // a mineral under the crosshair comes first
+        if (LookingAtSpade())
+        {
+            DigAudio.I?.Dig(0, worldSpade.Bottom);   // out of the soil
+            worldSpade.Take(player.cam, GiveSpade);
+            return;
+        }
         if (LookingAtCat()) { catHinted = true; shopCat.Pet(); return; }
         if (shop == null || workbench == null || !workbench.InRange(player.transform.position)) return;
         catHinted = true;   // you found the cat; it can tell you itself
@@ -476,6 +498,7 @@ public class DigGame : MonoBehaviour
     string ShopPrompt()
     {
         if (aimedMineral != null) return "<b>E</b>  <alpha=#BB>pick up";
+        if (LookingAtSpade()) return "<b>E</b>  <alpha=#BB>take the spade";
         if (shop == null || shop.IsOpen) return null;
         if (LookingAtCat()) return shopCat.Petting ? null : "<b>E</b>  <alpha=#BB>pet";
         if (workbench == null || !workbench.InRange(player.transform.position)) return null;
@@ -534,7 +557,7 @@ public class DigGame : MonoBehaviour
         // Where to dig: nothing says so until you stand on the patch (then, until the first
         // dig, a quiet prompt), and the cat wonders about it the first time you pass the shop.
         Vector3 here = player.transform.position;
-        bool onSpot = !hasDug && depth < 0.5f && new Vector2(here.x - digSpot.x, here.z - digSpot.z).magnitude < digHintRadius;
+        bool onSpot = !hasDug && HasSpade && depth < 0.5f && new Vector2(here.x - digSpot.x, here.z - digSpot.z).magnitude < digHintRadius;
         if (hasDug && digSpotLure != null && digSpotLure.activeSelf) FadeLure();
         if (!catHinted && DeepestDepth < 0.6f && !InputLocked && workbench != null && (here - workbench.transform.position).sqrMagnitude < 4.5f * 4.5f)
         {

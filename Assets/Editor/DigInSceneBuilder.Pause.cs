@@ -77,7 +77,7 @@ public static partial class DigInSceneBuilder
             (new[] { "W", "A", "S", "D" }, "walk"),
             (new[] { "Mouse" }, "look around"),
             (new[] { "Hold left click" }, "dig"),
-            (new[] { "E" }, "use, and talk to the cat"),
+            (new[] { "E" }, "pick things up, pet the cat"),
             (new[] { "R" }, "to the surface and back"),
             (new[] { "Esc" }, "menu"),
         };

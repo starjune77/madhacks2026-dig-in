@@ -57,10 +57,21 @@ public class DigShovel : MonoBehaviour
         if (load != null) loadScale = load.transform.localScale;
     }
 
+    // Empty-handed until the spade is taken from the dig spot (DigGame).
+    public bool Held { get; private set; } = true;
+    int level;
+
     public void SetLevel(int level)
     {
+        this.level = level;
         for (int i = 0; i < models.Length; i++)
-            if (models[i] != null) models[i].SetActive(i == level);
+            if (models[i] != null) models[i].SetActive(Held && i == level);
+    }
+
+    public void SetHeld(bool held)
+    {
+        Held = held;
+        SetLevel(level);
     }
 
     public void Swing()

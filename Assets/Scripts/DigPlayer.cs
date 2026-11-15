@@ -219,6 +219,15 @@ public class DigPlayer : MonoBehaviour
     void Dig(Mouse mouse)
     {
         bool held = mouse.leftButton.isPressed;
+        if (!DigGame.I.HasSpade)
+        {
+            // Empty-handed: nothing to swing yet. A click still picks up a memory.
+            if (!held) waitForRelease = false;
+            DigGame.I.HideAim();
+            var look = new Ray(cam.position, cam.forward);
+            if (mouse.leftButton.wasPressedThisFrame && !waitForRelease && DigGame.I.TryPickUp(look, reach + 0.4f)) waitForRelease = true;
+            return;
+        }
         if (!held) waitForRelease = false;
 
         var ray = new Ray(cam.position, cam.forward);
