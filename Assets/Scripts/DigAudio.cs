@@ -6,11 +6,11 @@ using UnityEngine.Audio;
 // sources in CREDITS.md), routed through the mixer's Music, SFX, Ambience and UI groups.
 // Sits on "Game"; clips are inspector data.
 //
-// Digging is layered and close, right at the ear (2D, the recordings' own stereo): the
-// blade biting into the ground (a set each for dirt, clay and stone) on the swing's
-// impact frame, the soil being lifted a moment later, a trickle of grains falling off the
-// blade when the earth is flicked away, and clods landing out in the world (3D). Every
-// layer picks a variation that is not the last one, with pitch +-4% and volume +-2 dB.
+// Digging is close, right at the ear (2D, the recordings' own stereo): only the crisp
+// bite of the blade into the ground (a short set each for dirt, clay and stone) on the
+// swing's impact frame, and soft, short thuds of clods landing out in the world (3D).
+// Nothing that hisses or trails on after the scoop. Every set picks a variation that is
+// not the last one, with pitch +-4% and volume +-2 dB.
 //
 // Around it: long seamless field-recording loops of the yard and the odd blackbird call
 // from somewhere around it; underground the yard fades and muffles, a soft room tone and
@@ -27,10 +27,8 @@ public class DigAudio : MonoBehaviour
 
     [Header("Digging")]
     public AudioClip[] dirtBite;
-    public AudioClip[] dirtLift;
     public AudioClip[] clayBite;
     public AudioClip[] stoneBite;
-    public AudioClip[] trickle;
     public AudioClip[] clods;
 
     [Header("Footsteps")]
@@ -206,25 +204,20 @@ public class DigAudio : MonoBehaviour
         s.Play();
     }
 
-    // The blade lands (animation event): the bite, then the soil coming up with it.
+    // The blade lands (animation event): just the bite.
     public void Dig(int stratum, Vector3 at)
     {
-        if (stratum >= 2)
-        {
-            PlayNear(stoneBite, 0.75f);
-            return;
-        }
-        PlayNear(stratum == 1 ? clayBite : dirtBite, 0.8f, stratum == 1 ? 0.97f : 1f);
-        PlayNear(dirtLift, 0.5f, stratum == 1 ? 0.9f : 1f, Random.Range(0.1f, 0.16f));
+        if (stratum >= 2) PlayNear(stoneBite, 0.75f);
+        else PlayNear(stratum == 1 ? clayBite : dirtBite, 0.8f, stratum == 1 ? 0.97f : 1f);
     }
 
     // Too hard for this spade: a dry scrape and a bounce.
     public void Bounce(Vector3 at) => PlayNear(stoneBite, 0.45f, 1.08f);
 
-    // The earth is flicked off the blade: grains trickle away, tailing off on their own.
-    public void Toss(Vector3 at) => PlayNear(trickle, 0.42f, 1f, 0.05f);
+    // The earth is flicked off the blade: silent; the clods make their own soft thuds when they land.
+    public void Toss(Vector3 at) { }
 
-    public void ClodLanded(Vector3 at, float strength) => PlayAt(clods, 0.25f + Mathf.Clamp01(strength) * 0.45f, at);
+    public void ClodLanded(Vector3 at, float strength) => PlayAt(clods, 0.2f + Mathf.Clamp01(strength) * 0.35f, at);
     public void Mineral() => PlayNear(mineral, 0.4f, 1.2f, 0f, 0.2f, uiGroup);
     public void Page() => PlayNear(page, 0.45f, 1f, 0f, 0f, uiGroup);
 

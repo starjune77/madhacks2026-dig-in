@@ -286,6 +286,40 @@ public static class DigAudioCutter
         return sb.ToString();
     }
 
+    // Reworks one-shots this tool wrote: keeps only the first `length` s (fading out over
+    // the last `fade` s), optionally through a gentle low-pass (`lowpassHz`, 0 = none),
+    // then levels them like Level().
+    public static string Rework(string dir, string pattern, float length, float fade, float lowpassHz, float rmsDb)
+    {
+        foreach (var f in Directory.GetFiles(dir, pattern))
+        {
+            if (f.EndsWith(".meta")) continue;
+            var p = ReadWav(f);
+            p = Slice(p, 0f, Mathf.Min(length, p.Seconds));
+            if (lowpassHz > 0f) LowPass(p, lowpassHz);
+            Fade(p, 0.002f, fade);
+            Write(f, p);
+        }
+        return Level(dir, pattern, rmsDb);
+    }
+
+    // Two passes of a one-pole low-pass: takes the hiss and grit off, keeps the body.
+    public static void LowPass(Pcm p, float hz)
+    {
+        float a = 1f - Mathf.Exp(-2f * Mathf.PI * hz / p.rate);
+        for (int pass = 0; pass < 2; pass++)
+            for (int c = 0; c < p.channels; c++)
+            {
+                float y = 0f;
+                for (int f = 0; f < p.Frames; f++)
+                {
+                    int i = f * p.channels + c;
+                    y += a * (p.data[i] - y);
+                    p.data[i] = y;
+                }
+            }
+    }
+
     // Reads back a 16-bit PCM WAV as written by Write().
     public static Pcm ReadWav(string path)
     {

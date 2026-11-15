@@ -11073,16 +11073,6 @@ MonoBehaviour:
   - {fileID: 8300000, guid: ed67bb30baa08f04dbf856fe4dbc5395, type: 3}
   - {fileID: 8300000, guid: 1bdbb625f2f564748ae959619d32dcbc, type: 3}
   - {fileID: 8300000, guid: b290f6d92ffce1341b92fd5a9469ce2f, type: 3}
-  dirtLift:
-  - {fileID: 8300000, guid: 93a78cb53283072469dc33bcb6abf65a, type: 3}
-  - {fileID: 8300000, guid: aa1e54db427843a44bf4b5442d388e26, type: 3}
-  - {fileID: 8300000, guid: fd0799fbbafa1364d89d0a79b3b97a3f, type: 3}
-  - {fileID: 8300000, guid: 4d7926d4cc1cda94ab94ff812a41d9ca, type: 3}
-  - {fileID: 8300000, guid: c25bec11c44b0b54c8e5638772de9ada, type: 3}
-  - {fileID: 8300000, guid: f42ec9a277d9fd94e917c77400402860, type: 3}
-  - {fileID: 8300000, guid: eeae9d424ee8a89409f8f0cdf03f7c46, type: 3}
-  - {fileID: 8300000, guid: 364aefa3fa6bc5649a936a68d9cdf0bf, type: 3}
-  - {fileID: 8300000, guid: 2881811e95ce6e743acec7c96473a5d8, type: 3}
   clayBite:
   - {fileID: 8300000, guid: fb3bd873923402e438a22faa39e0afd7, type: 3}
   - {fileID: 8300000, guid: ecc0a44f85c438747acca00a385b364e, type: 3}
@@ -11104,13 +11094,6 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 9d209ae7d1a763d47bf8b162cce3046c, type: 3}
   - {fileID: 8300000, guid: ed2847a1126a3244fb5143ea9e1dbe5a, type: 3}
   - {fileID: 8300000, guid: d980a2efd940ac842a46ca0c71203f24, type: 3}
-  trickle:
-  - {fileID: 8300000, guid: 6f5847bb11ac3d04c88c6d690b83f87a, type: 3}
-  - {fileID: 8300000, guid: 49cfcd91a8028b34bb06367388ba0cbf, type: 3}
-  - {fileID: 8300000, guid: eb7e203d7eff94a46b3e6ed51e64aee4, type: 3}
-  - {fileID: 8300000, guid: 5697f9289a73f4c4f9792ad746812b54, type: 3}
-  - {fileID: 8300000, guid: 68ba5202472ffc24ebf86ac8f5daad7c, type: 3}
-  - {fileID: 8300000, guid: c8982e2d25c8494438fa80c7afb681d5, type: 3}
   clods:
   - {fileID: 8300000, guid: c845689613b352646b4c8ca6d48aed28, type: 3}
   - {fileID: 8300000, guid: 0dfc0c58888c17441a9b470cc68d4118, type: 3}
@@ -11119,9 +11102,6 @@ MonoBehaviour:
   - {fileID: 8300000, guid: f93f6b4d4d58c4b41be7d14c8fedbb8f, type: 3}
   - {fileID: 8300000, guid: 61f0ea7ccc501fb47911571ed7a01ce2, type: 3}
   - {fileID: 8300000, guid: 60a81915710b41d498ffc678f39196de, type: 3}
-  - {fileID: 8300000, guid: e591ab26ebf24654c8c9790e11828885, type: 3}
-  - {fileID: 8300000, guid: 0c80b8c1e17663143a5d2b2e7d94d46f, type: 3}
-  - {fileID: 8300000, guid: 8d0b8d8b062f6c049a6fd18879ea910f, type: 3}
   stepsGrass:
   - {fileID: 8300000, guid: 50d550997b49c334d894e453a76ede1d, type: 3}
   - {fileID: 8300000, guid: a716608425b2eb446b8799deb47755ea, type: 3}

@@ -51,10 +51,8 @@ public static partial class DigInSceneBuilder
         a.uiGroup = MixerGroup(a.mixer, "UI");
 
         a.dirtBite = Clips("Dig/Dirt", "Bite_*.wav");
-        a.dirtLift = Clips("Dig/Dirt", "Lift_*.wav");
         a.clayBite = Clips("Dig/Clay");
         a.stoneBite = Clips("Dig/Stone");
-        a.trickle = Clips("Dig/Trickle");
         a.clods = Clips("Dig/Clods");
         a.stepsGrass = Clips("Steps/Grass");
         a.stepsDirt = Clips("Steps/Dirt");
@@ -71,7 +69,7 @@ public static partial class DigInSceneBuilder
         a.musicUnderground = Stream("Music/Underground.ogg");
         a.musicEnding = Stream("Music/Ending.wav");
         EditorUtility.SetDirty(a);
-        int shots = a.dirtBite.Length + a.dirtLift.Length + a.clayBite.Length + a.stoneBite.Length + a.trickle.Length + a.clods.Length
+        int shots = a.dirtBite.Length + a.clayBite.Length + a.stoneBite.Length + a.clods.Length
                   + a.stepsGrass.Length + a.stepsDirt.Length + a.mineral.Length + a.page.Length + a.meow.Length + a.birdCalls.Length;
         report.AppendLine("  audio: " + shots + " one-shots, 3 ambience loops, 3 music pieces, mixer " + (a.mixer != null ? "ok" : "MISSING"));
     }
