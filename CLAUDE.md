@@ -75,8 +75,8 @@ Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline 
 
 ## Meshy (generated 3D assets)
 
-- **Budget: 245 credits left, and no more budget.** Before any generation, say what it is for and its cost. Never regenerate or refine for small improvements. The only allowed use was the nine memory objects (already done); everything else (minerals, spades, props, house, fence, furniture) comes from Poly Haven or the Unity demo pack, with material and scale variants.
-- Models already generated and kept: the house, fence, spade, bookshelf, shop counter, cat (sitting and sleeping), bed, eleven minerals and nine memory objects.
+- **Budget: 128 credits left, and no more budget** (117 went to the Munchkin cat on 2026-11-15). Before any generation, say what it is for and its cost. Never regenerate or refine for small improvements. The only allowed use was the nine memory objects (already done); everything else (minerals, spades, props, house, fence, furniture) comes from Poly Haven or the Unity demo pack, with material and scale variants.
+- Models already generated and kept: the house, fence, spade, bookshelf, shop counter, the Munchkin kitten (sitting, paw-licking, sleeping; the old cat models are unused), bed, eleven minerals and nine memory objects.
 - Style: **realistic PBR** (base colour, normal, roughness, metallic), worn and lived-in, warm and nostalgic. Not low poly, not stylized. 2K textures.
 - Report credits used after each batch.
 - Save Meshy assets under `Assets/ThirdParty/Meshy/<AssetName>/`. They are generated on a paid plan with full commercial rights.

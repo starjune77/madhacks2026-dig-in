@@ -177,7 +177,20 @@ public static partial class DigInSceneBuilder
         hud.shopLanterns = Row("Lanterns", 2, 3);
         hud.shopBuyPage.SetActive(false);
 
-        hud.shopCat = Ink("Cat", p, italic, 28f, TextAlignmentOptions.Center, "“Mrrp.”", new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(1100f, 56f), 0.85f);
+        // The cat's words along the bottom, beside a small portrait of it.
+        hud.shopCat = Ink("Cat", p, italic, 28f, TextAlignmentOptions.Center, "“Mrrp.”", new Vector2(0.5f, 0f), new Vector2(50f, 20f), new Vector2(980f, 56f), 0.85f);
+        var portrait = CatPortrait();
+        if (portrait != null)
+        {
+            var frame = UiNode("Cat Portrait", p, Vector2.zero, Vector2.zero, new Vector2(36f, 10f), new Vector2(84f, 84f));
+            var img = frame.gameObject.AddComponent<Image>();
+            img.sprite = portrait;
+            img.preserveAspect = true;
+            img.raycastTarget = false;
+            var edge = frame.gameObject.AddComponent<Outline>();
+            edge.effectColor = new Color(InkColor.r, InkColor.g, InkColor.b, 0.35f);
+            edge.effectDistance = new Vector2(1.5f, -1.5f);
+        }
     }
 
     // A tab: a button whose colour DigShop sets (dark for the open page, pale otherwise).

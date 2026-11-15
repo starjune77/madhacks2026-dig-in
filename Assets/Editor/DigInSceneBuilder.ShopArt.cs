@@ -75,6 +75,16 @@ public static partial class DigInSceneBuilder
     }
 
     // `keep`: only the parts whose names contain it (the suitcase model is a pair).
+    // The cat, sitting, seen from the front: for the UI wherever the cat speaks.
+    static Sprite CatPortrait()
+    {
+        var cat = MeshyAsset("Munchkin", 0.15f);
+        if (cat == null) return null;
+        EnsureFolder(ShopArtDir);
+        return RenderStill(ShopArtDir + "/Cat Portrait.png", 320, 320, new Color(0.93f, 0.86f, 0.72f),
+            h => MeshyModel(cat, h, null, 1f), Quaternion.Euler(6f, 180f, 0f), 0.8f);
+    }
+
     static Sprite RenderPolyHaven(string name, string id, string keep = null)
     {
         var asset = PolyHavenAsset(id);

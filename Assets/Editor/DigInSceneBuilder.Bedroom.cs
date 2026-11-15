@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 // DigStory switches to it after the blank page.
 public static partial class DigInSceneBuilder
 {
-    const string BedroomVersion = "v3 curtains";
+    const string BedroomVersion = "v6 munchkin";
     static readonly Vector3 BedroomPos = new Vector3(420f, 0f, 420f);
     // Which end of the Meshy bed has the pillow, along its long axis (+1 or -1).
     const float PillowEnd = 1f;
@@ -72,7 +72,7 @@ public static partial class DigInSceneBuilder
         Vector3 chest = new Vector3(bedLocal.x, 0f, Mathf.Lerp(headZ, footZ, 0.4f));
         float top = TopOf(bedGo, room.TransformPoint(chest), bed);
 
-        var cat = MakeCat("CatSleeping", 0.38f, false);
+        var cat = MakeCat("MunchkinSleeping", 0.36f, false);
         if (cat != null)
         {
             cat.transform.SetParent(room, true);
@@ -88,7 +88,7 @@ public static partial class DigInSceneBuilder
         camGo.transform.position = new Vector3(eye.x, eyeTop + 0.16f, eye.z);
         Vector3 look = (cat != null ? cat.transform.position + Vector3.up * 0.12f : room.TransformPoint(chest)) - camGo.transform.position;
         Vector3 window = room.TransformPoint(new Vector3(0f, sill + wh * 0.5f, z)) - camGo.transform.position;
-        camGo.transform.rotation = Quaternion.LookRotation(Vector3.Slerp(look.normalized, window.normalized, 0.5f));
+        camGo.transform.rotation = Quaternion.LookRotation(Vector3.Slerp(look.normalized, window.normalized, 0.38f));
         var cam = camGo.AddComponent<Camera>();
         cam.fieldOfView = 58f;
         cam.nearClipPlane = 0.03f;
@@ -109,6 +109,18 @@ public static partial class DigInSceneBuilder
         spot.intensity = 6f;
         spot.color = new Color(1f, 0.86f, 0.66f);
         spot.shadows = LightShadows.Soft;
+        // A soft warm light on the sleeping kitten, so its face reads against the bright window.
+        if (cat != null)
+        {
+            var catLight = new GameObject("Cat Fill").AddComponent<Light>();
+            catLight.transform.SetParent(room, true);
+            catLight.transform.position = Vector3.Lerp(cat.transform.position, camGo.transform.position, 0.55f) + Vector3.up * 0.25f;
+            catLight.type = LightType.Point;
+            catLight.range = 0.9f;
+            catLight.intensity = 0.25f;
+            catLight.color = new Color(1f, 0.88f, 0.74f);
+            catLight.shadows = LightShadows.None;
+        }
         var fill = new GameObject("Room Fill").AddComponent<Light>();
         fill.transform.SetParent(room, false);
         fill.transform.localPosition = new Vector3(0.6f, h - 0.4f, 0.4f);

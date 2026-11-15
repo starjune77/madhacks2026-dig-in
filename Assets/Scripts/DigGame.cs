@@ -30,6 +30,8 @@ public class DigGame : MonoBehaviour
     public DigStory story;
     public DigShop shop;
     public DigPause pause;
+    [Tooltip("The cat on the counter (petting).")]
+    public DigCat shopCat;
     public DigMinerals minerals;
     public DigAtmosphere atmosphere;
     [Tooltip("The shop counter: walk up to it and press E.")]
@@ -448,19 +450,31 @@ public class DigGame : MonoBehaviour
 
     // ---- Surface ------------------------------------------------------------
     // E key. At the shop counter, opens the shop.
+    // E: looking at the cat pets it; anywhere else at the counter opens the shop.
     public void Interact()
     {
+        if (LookingAtCat()) { catHinted = true; shopCat.Pet(); return; }
         if (shop == null || workbench == null || !workbench.InRange(player.transform.position)) return;
         catHinted = true;   // you found the cat; it can tell you itself
         shop.Open();
     }
 
+    // The crosshair is on the cat, close enough to reach.
+    public bool LookingAtCat()
+    {
+        if (shopCat == null || !shopCat.isActiveAndEnabled || (shop != null && shop.IsOpen)) return false;
+        Vector3 to = shopCat.transform.position + Vector3.up * 0.16f - player.cam.position;
+        return to.magnitude < 2.4f && Vector3.Angle(player.cam.forward, to) < 12f;
+    }
+
     string ShopPrompt()
     {
-        if (shop == null || shop.IsOpen || workbench == null || !workbench.InRange(player.transform.position)) return null;
+        if (shop == null || shop.IsOpen) return null;
+        if (LookingAtCat()) return shopCat.Petting ? null : "<b>E</b>  <alpha=#BB>pet";
+        if (workbench == null || !workbench.InRange(player.transform.position)) return null;
         return bag.Count > 0
-            ? "Press <b>E</b> to see the cat  <alpha=#99>(" + bag.Count + " stones to sell)"
-            : "Press <b>E</b> to see the cat";
+            ? "Press <b>E</b> for the shop  <alpha=#99>(" + bag.Count + " stones to sell)"
+            : "Press <b>E</b> for the shop";
     }
 
     // R key: up to the surface from below, and back down to where you were from above.
