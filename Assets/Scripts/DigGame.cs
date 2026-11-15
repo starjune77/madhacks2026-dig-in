@@ -519,6 +519,7 @@ public class DigGame : MonoBehaviour
         {
             catHinted = true;
             hud.ShowMessage(catWonder, 5f);
+            DigAudio.I?.Meow();   // a small sound from the counter; the music steps back
         }
 
         // The back door does not open. Nobody is home; nobody ever is, here.

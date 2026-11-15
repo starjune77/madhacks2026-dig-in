@@ -38,7 +38,7 @@ public class DigPause : MonoBehaviour
     {
         // Saved settings (per player, on this machine).
         float volume = Get(VolumeKey, 1f);
-        AudioListener.volume = volume;
+        SetVolume(volume);
         if (game.player != null) game.player.lookSensitivity = Get(SensitivityKey, game.player.lookSensitivity);
 
         hud.pauseResume.onClick.AddListener(Resume);
@@ -49,7 +49,7 @@ public class DigPause : MonoBehaviour
         hud.pauseQuitNo.onClick.AddListener(() => Show(Page.Menu));
         hud.pauseQuitYes.onClick.AddListener(Quit);
         hud.pauseVolume.SetValueWithoutNotify(volume);
-        hud.pauseVolume.onValueChanged.AddListener(v => { AudioListener.volume = v; Set(VolumeKey, v); });
+        hud.pauseVolume.onValueChanged.AddListener(v => { SetVolume(v); Set(VolumeKey, v); });
         if (game.player != null)
             hud.pauseSensitivity.SetValueWithoutNotify(Mathf.InverseLerp(sensitivityRange.x, sensitivityRange.y, game.player.lookSensitivity));
         hud.pauseSensitivity.onValueChanged.AddListener(v =>
@@ -139,6 +139,13 @@ public class DigPause : MonoBehaviour
     public void OpenMenu()
     {
         if (!IsOpen) Open(Page.Menu);
+    }
+
+    // Through the mixer's master volume (DigAudio), or the listener if there is none.
+    static void SetVolume(float v)
+    {
+        if (DigAudio.I != null) DigAudio.I.SetMasterVolume(v);
+        else AudioListener.volume = v;
     }
 
     void Quit()
