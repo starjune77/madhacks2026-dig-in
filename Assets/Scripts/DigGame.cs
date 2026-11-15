@@ -306,7 +306,8 @@ public class DigGame : MonoBehaviour
             float distance = path.DistanceAtDepth(boundary + volume.wobble + 0.5f);
             SkipMemoriesBefore(distance);
             TunnelTo(distance);
-            StandOnPath(distance - 1.2f);
+            // A few steps back, looking along the tunnel: its walls lead the eye to the face.
+            StandOnPath(distance - 3f, 2f);
         }
         hud.ShowMessage(StratumNames[stratum], 2f);
     }
@@ -347,14 +348,14 @@ public class DigGame : MonoBehaviour
         if (minerals != null) foreach (var p in points) minerals.ClearInside(p, 1.3f);
     }
 
-    void StandOnPath(float distance)
+    void StandOnPath(float distance, float lookDown = 12f)
     {
         Vector3 p = path.PointAt(distance);
         Vector3 forward = path.TangentAt(distance);
         player.Teleport(p + Vector3.up * 0.6f);
         float yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
         float pitch = Mathf.Clamp(Mathf.Asin(-forward.y) * Mathf.Rad2Deg, -10f, 45f);
-        player.SetLook(yaw, pitch + 12f);
+        player.SetLook(yaw, pitch + lookDown);
     }
 
     void SetShovel(int level)
