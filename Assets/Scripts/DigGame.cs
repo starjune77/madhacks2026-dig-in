@@ -89,6 +89,8 @@ public class DigGame : MonoBehaviour
     void Awake()
     {
         I = this;
+        // Never let a slow frame turn into many physics steps (and a slower frame).
+        Time.maximumDeltaTime = 0.1f;
         int mask = Physics.DefaultRaycastLayers;
         int playerLayer = LayerMask.NameToLayer("Player"), debrisLayer = LayerMask.NameToLayer("Debris");
         if (playerLayer >= 0) mask &= ~(1 << playerLayer);

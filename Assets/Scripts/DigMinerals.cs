@@ -109,11 +109,15 @@ public class DigMinerals : MonoBehaviour
         body.mass = 0.3f;
         body.linearDamping = 0.2f;
         body.angularDamping = 1.5f;
+        // Sized in world metres: the model's own units can be anything (a 0.5-unit sphere
+        // on a Meshy model was 3 m across and choked the physics).
         var col = s.shown.AddComponent<SphereCollider>();
-        col.radius = 0.5f;
+        col.radius = s.kind.size * 0.4f / Mathf.Max(0.0001f, s.shown.transform.lossyScale.x);
+        col.center = s.shown.transform.InverseTransformPoint(Bounds(s.shown).center);
         int layer = LayerMask.NameToLayer("Debris");
         if (layer >= 0) s.shown.layer = layer;
-        body.linearVelocity = (toward.normalized * 0.8f + Vector3.up * 1.8f) + Random.insideUnitSphere * 0.4f;
+        body.linearVelocity = (toward.normalized * 0.6f + Vector3.up * 1.4f) + Random.insideUnitSphere * 0.3f;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         body.angularVelocity = Random.insideUnitSphere * 6f;
         s.loose = body;
         loose.Add(s);
