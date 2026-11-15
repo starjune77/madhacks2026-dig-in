@@ -69,7 +69,7 @@ Performance budget: 60 fps at 1080p on the developer's laptop. Check frame time 
 Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline package `com.unity.pipeline`).
 
 - **After every visual change, enter Play mode, take screenshots, look at them, and fix problems before reporting to the developer. Read the Console after every change.**
-- Build Scene: `unity command script eval -- --code 'DigInSceneBuilder.BuildScene(); return 1;'`. Screenshots: `unity command capture game_view -- --source screen --output-path <absolute path outside the repo>`.
+- Build Scene: `unity command script eval -- --code 'DigInSceneBuilder.BuildSceneUnattended(); return 1;'` (never use `BuildScene()` from automation: it can open a save prompt that blocks the Editor). Screenshots: `unity command capture game_view -- --source screen --output-path <absolute path outside the repo>`.
 - Run `unity` from Git Bash, not PowerShell 5.1 (it strips the quotes inside C# snippets).
 - Simulated keys and clicks do not reach the game while the Editor window is in the background. Drive the game through its public methods instead (`DigGame.I.DemoJump(n)`, `DemoEnding()`, `DigGame.I.Dig(...)`, `TryPickUp`, `player.Teleport` / `SetLook`), and ask the developer to check anything that needs real input.
 - Screenshots cannot show feel. Anything about feel (swing, impact, debris, movement) needs a developer play-test before it counts as done.

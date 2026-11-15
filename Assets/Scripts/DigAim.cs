@@ -37,14 +37,15 @@ public class DigAim : MonoBehaviour
         Vector3 t = Vector3.Cross(n, Mathf.Abs(n.y) < 0.9f ? Vector3.up : Vector3.right).normalized;
         Vector3 b = Vector3.Cross(n, t);
         float r = radius * ringScale;
+        Vector3 last = hit.point + n * 0.02f;
         for (int i = 0; i < segments; i++)
         {
             float a = i * Mathf.PI * 2f / segments;
             Vector3 p = hit.point + (t * Mathf.Cos(a) + b * Mathf.Sin(a)) * r;
             // Drop each point onto the real surface.
             if (Physics.Raycast(p + n * 0.6f, -n, out RaycastHit s, 1.8f, mask, QueryTriggerInteraction.Ignore)) p = s.point + s.normal * 0.02f;
-            else p += n * 0.02f;
-            points[i] = p;
+            else p = last;
+            points[i] = last = p;
         }
         line.SetPositions(points);
     }

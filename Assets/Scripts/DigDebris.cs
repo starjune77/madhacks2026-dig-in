@@ -15,8 +15,10 @@ public class DigDebris : MonoBehaviour
     public Material[] clodMaterials;
     public PhysicsMaterial clodPhysics;
     [Tooltip("Most clods alive at once. The oldest is reused when the pool runs out.")]
-    public int maxClods = 260;
-    public Vector2 clodSize = new Vector2(0.05f, 0.13f);
+    public int maxClods = 420;
+    public Vector2 clodSize = new Vector2(0.06f, 0.16f);
+    [Tooltip("How quickly a rolling clod comes to rest. Low values let them roll across the yard.")]
+    public float rollDamping = 3.5f;
 
     [Header("Particles")]
     public ParticleSystem crumbs;
@@ -32,8 +34,10 @@ public class DigDebris : MonoBehaviour
     [Header("How much comes out")]
     public int impactCrumbs = 14;
     public int impactClods = 3;
-    public int tossClods = 7;
-    public int tossCrumbs = 10;
+    public int tossClods = 12;
+    public int tossCrumbs = 14;
+    [Tooltip("Speed of tossed earth (m/s). Lower lands it closer, in a pile.")]
+    public Vector2 tossSpeed = new Vector2(1.5f, 2.7f);
 
     class Clod
     {
@@ -67,8 +71,8 @@ public class DigDebris : MonoBehaviour
             c.collider = go.AddComponent<SphereCollider>();
             c.collider.sharedMaterial = clodPhysics;
             c.body = go.AddComponent<Rigidbody>();
-            c.body.linearDamping = 0.05f;
-            c.body.angularDamping = 0.6f;
+            c.body.linearDamping = 0.08f;
+            c.body.angularDamping = rollDamping;
             c.body.maxDepenetrationVelocity = 2f;
             go.SetActive(false);
             clods[i] = c;
@@ -99,8 +103,8 @@ public class DigDebris : MonoBehaviour
         direction.Normalize();
         int n = Mathf.RoundToInt(tossClods * amount);
         for (int i = 0; i < n; i++)
-            Throw(from + Random.insideUnitSphere * 0.1f, direction * Random.Range(2.2f, 3.6f) + Random.insideUnitSphere * 0.7f, stratum, 1f);
-        EmitCrumbs(from, direction, 3f, 0.5f, stratum, Mathf.RoundToInt(tossCrumbs * amount));
+            Throw(from + Random.insideUnitSphere * 0.1f, direction * Random.Range(tossSpeed.x, tossSpeed.y) + Random.insideUnitSphere * 0.6f, stratum, 1f);
+        EmitCrumbs(from, direction, tossSpeed.y, 0.5f, stratum, Mathf.RoundToInt(tossCrumbs * amount));
         Puff(from, direction, stratum, 2, 0.6f);
     }
 

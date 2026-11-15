@@ -41,6 +41,9 @@ public class DigPlayer : MonoBehaviour
     public float kickRecover = 11f;
     public float bobHeight = 0.016f;
 
+    // Walks without keys: x = strafe, y = forward, each -1..1. Zero means "use the keyboard".
+    [System.NonSerialized] public Vector2 scriptedMove;
+
     CharacterController cc;
     float pitch;
     Vector3 velocity;        // horizontal walking velocity
@@ -134,6 +137,7 @@ public class DigPlayer : MonoBehaviour
         float dt = Time.deltaTime;
         float x = (kb.dKey.isPressed ? 1f : 0f) - (kb.aKey.isPressed ? 1f : 0f);
         float z = (kb.wKey.isPressed ? 1f : 0f) - (kb.sKey.isPressed ? 1f : 0f);
+        if (scriptedMove != Vector2.zero) { x = scriptedMove.x; z = scriptedMove.y; }
         Vector3 wish = transform.right * x + transform.forward * z;
         if (wish.sqrMagnitude > 1f) wish.Normalize();
 

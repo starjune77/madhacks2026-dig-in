@@ -14,7 +14,7 @@ using UnityEngine.Rendering;
 public static partial class DigInSceneBuilder
 {
     const string AnimDir = "Assets/Animations";
-    const int SwingVersion = 4;     // bump to rewrite the clips (hand edits are lost)
+    const int SwingVersion = 5;     // bump to rewrite the clips (hand edits are lost)
 
     class Feel
     {
@@ -167,26 +167,37 @@ public static partial class DigInSceneBuilder
 
         File.WriteAllText(marker, "Marks the version of the shovel clips made by DigIn > Build Scene.\n");
         AssetDatabase.ImportAsset(marker);
-        if (existing != null) return existing;
 
-        var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+        // States are added to an existing controller in place, so the Player prefab keeps its reference.
+        var controller = existing != null ? existing : AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
         var sm = controller.layers[0].stateMachine;
-        var idleState = sm.AddState("Idle");
-        idleState.motion = idle;
+        var idleState = State(sm, "Idle", idle);
         sm.defaultState = idleState;
-        foreach (var (name, clip) in new[] { ("Swing", swing), ("Bounce", bounce) })
+        // "Swing" and "Swing 2" are the same clip: holding the button cross-fades from one
+        // into the other, because an Animator will not cross-fade a state into itself.
+        foreach (var (name, clip) in new[] { ("Swing", swing), ("Swing 2", swing), ("Bounce", bounce) })
         {
-            var state = sm.AddState(name);
-            state.motion = clip;
+            var state = State(sm, name, clip);
+            if (state.transitions.Length > 0) continue;
             var back = state.AddTransition(idleState);
             back.hasExitTime = true;
             back.exitTime = 0.98f;
             back.hasFixedDuration = true;
             back.duration = 0.05f;
         }
-
-        Created(controllerPath);
+        EditorUtility.SetDirty(controller);
+        if (existing == null) Created(controllerPath);
         return controller;
+    }
+
+    static AnimatorState State(AnimatorStateMachine sm, string name, Motion motion)
+    {
+        AnimatorState state = null;
+        foreach (var child in sm.states)
+            if (child.state.name == name) state = child.state;
+        if (state == null) state = sm.AddState(name);
+        state.motion = motion;
+        return state;
     }
 
     static AnimationEvent Event(float time, string function)

@@ -135,12 +135,14 @@ public class DigGame : MonoBehaviour
         lastStratum = stratum;
         lastAmount = radius / shovelRadius[shovelLevel];
         tossPending = true;
+        shovel.ShowLoad(debris.clodMaterials[Mathf.Clamp(stratum, 0, debris.clodMaterials.Length - 1)], lastAmount);
         return DigOutcome.Dug;
     }
 
     // Called by the player when the swing flicks the earth off the blade.
     public void Toss(Vector3 from, Vector3 direction)
     {
+        shovel.HideLoad();
         if (!tossPending) return;
         tossPending = false;
         debris.Toss(from, direction, lastStratum, lastAmount);

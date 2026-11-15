@@ -14,6 +14,8 @@ public class DigShovel : MonoBehaviour
     public GameObject[] models;
     [Tooltip("Tip of the blade: where tossed earth leaves the shovel.")]
     public Transform blade;
+    [Tooltip("The clump of earth on the blade between the bite and the toss.")]
+    public MeshRenderer load;
 
     [Header("Impact")]
     [Tooltip("Seconds the swing freezes when the blade bites.")]
@@ -32,7 +34,9 @@ public class DigShovel : MonoBehaviour
     // False from the start of a swing until the clip says the next one may begin.
     public bool Ready { get; private set; } = true;
 
+    // Two states with the same clip: a held button cross-fades from one swing into the next.
     static readonly int SwingState = Animator.StringToHash("Swing");
+    static readonly int SwingState2 = Animator.StringToHash("Swing 2");
     static readonly int BounceState = Animator.StringToHash("Bounce");
 
     Animator animator;
@@ -41,12 +45,16 @@ public class DigShovel : MonoBehaviour
     Vector2 lag;
     float stopTimer;
     float busyTimer;
+    bool second;
+    Vector3 loadScale;
+    float loadGrow;
 
     void Awake()
     {
         animator = GetComponent<Animator>();
         restPosition = transform.localPosition;
         restRotation = transform.localRotation;
+        if (load != null) loadScale = load.transform.localScale;
     }
 
     public void SetLevel(int level)
@@ -61,7 +69,25 @@ public class DigShovel : MonoBehaviour
         busyTimer = 1.5f;
         animator.speed = 1f;
         stopTimer = 0f;
-        animator.CrossFadeInFixedTime(SwingState, 0.07f, 0, 0f);
+        HideLoad();
+        animator.CrossFadeInFixedTime(second ? SwingState2 : SwingState, 0.07f, 0, 0f);
+        second = !second;
+    }
+
+    // The blade came out of the ground with earth on it.
+    public void ShowLoad(Material material, float amount)
+    {
+        if (load == null) return;
+        load.sharedMaterial = material;
+        load.transform.localRotation = Quaternion.Euler(UnityEngine.Random.Range(-8f, 8f), UnityEngine.Random.Range(0f, 360f), 0f);
+        load.transform.localScale = loadScale * 0.2f;
+        loadGrow = Mathf.Lerp(0.7f, 1f, Mathf.Clamp01(amount)) * UnityEngine.Random.Range(0.9f, 1.1f);
+        load.gameObject.SetActive(true);
+    }
+
+    public void HideLoad()
+    {
+        if (load != null) load.gameObject.SetActive(false);
     }
 
     // The blade bit into the ground: hold the pose for a moment.
@@ -76,6 +102,7 @@ public class DigShovel : MonoBehaviour
     {
         animator.speed = 1f;
         stopTimer = 0f;
+        HideLoad();
         animator.CrossFadeInFixedTime(BounceState, 0.03f, 0, 0f);
     }
 
@@ -92,6 +119,10 @@ public class DigShovel : MonoBehaviour
             stopTimer -= Time.unscaledDeltaTime;
             if (stopTimer <= 0f) animator.speed = 1f;
         }
+
+        // The load swells onto the blade as it is levered out of the ground.
+        if (load != null && load.gameObject.activeSelf && stopTimer <= 0f)
+            load.transform.localScale = Vector3.MoveTowards(load.transform.localScale, loadScale * loadGrow, loadScale.z * 9f * Time.deltaTime);
 
         // Never get stuck waiting for an event that did not come.
         if (!Ready)

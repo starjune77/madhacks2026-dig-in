@@ -38,13 +38,13 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v4 animated shovel";
+    const string PlayerVersion = "v5 loaded blade";
     const string FindVersion = "v2 kenney box";
     const string ShelfVersion = "v2 bookcase";
     const string BenchVersion = "v2 kenney bench";
     const string HudVersion = "v6 ending layout";
     const string HubVersion = "v3 spawn height";      // marker child of scene/Surface Hub
-    const string DigSiteVersion = "v3 volume";        // marker child of scene/Dig Site
+    const string DigSiteVersion = "v4 volume";        // marker child of scene/Dig Site
     const string EnvVersion = "v2 backyard";          // marker child of scene/Environment
     const string PageVersion = "v1 page";
 
@@ -64,8 +64,30 @@ public static partial class DigInSceneBuilder
     [MenuItem("DigIn/Build Scene", false, 0)]
     public static void BuildScene()
     {
+        Build(unattended: false);
+    }
+
+    // For automation (unity command script eval): never opens a dialog, which would block
+    // the Editor with nobody there to answer it. Unsaved changes to open scenes are saved
+    // first, exactly as answering "Save" in the menu version would.
+    public static void BuildSceneUnattended()
+    {
+        Build(unattended: true);
+    }
+
+    static void Build(bool unattended)
+    {
         if (!EnsureTmpResources()) return;
-        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+        if (unattended)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogWarning("DigIn/Build Scene: leave Play mode first.");
+                return;
+            }
+            EditorSceneManager.SaveOpenScenes();
+        }
+        else if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
 
         report = new StringBuilder("DigIn/Build Scene\n");
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -462,6 +484,19 @@ public static partial class DigInSceneBuilder
         blade.SetParent(pivot, false);
         blade.localPosition = new Vector3(0f, 0.04f, 0.5f);
         shovel.blade = blade;
+
+        // The earth the blade lifts out: shown from the bite until it is flicked away.
+        var load = new GameObject("Load", typeof(MeshFilter), typeof(MeshRenderer));
+        load.transform.SetParent(blade, false);
+        load.transform.localPosition = new Vector3(0f, 0.015f, -0.07f);
+        load.transform.localRotation = Quaternion.Euler(0f, 35f, 0f);
+        load.transform.localScale = new Vector3(0.17f, 0.085f, 0.21f);
+        load.GetComponent<MeshFilter>().sharedMesh = feel.clodMeshes[1];
+        var loadRenderer = load.GetComponent<MeshRenderer>();
+        loadRenderer.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/Clod Dirt.mat");
+        loadRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        load.SetActive(false);
+        shovel.load = loadRenderer;
 
         player.cam = camGo.transform;
         player.shovel = shovel;
