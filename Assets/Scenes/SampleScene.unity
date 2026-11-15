@@ -11226,6 +11226,9 @@ MonoBehaviour:
   catWonder: "The cat watches the bare patch by the stones for a moment.  <i>\u201CSomething's under the soft ground, I think.\u201D</i>"
   digSpotLure: {fileID: 483818688}
   backDoor: {x: 3.2, y: 0.8, z: -15.2}
+  firstMemoryDepth: 1.7
+  firstMemoryReach: 1.5
+  memoryMagnet: 3
 --- !u!114 &1016677361
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11419,6 +11422,7 @@ MonoBehaviour:
   - You're the one who left that window open, every summer.
   - You always say you'll call back. You will, this time.
   - It's later than it looks out here.
+  firstSale: The warm soil remembers more.
 --- !u!114 &1016677365
 MonoBehaviour:
   m_ObjectHideFlags: 0

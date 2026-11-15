@@ -259,22 +259,48 @@ public class DigGame : MonoBehaviour
     // ---- Memory objects -----------------------------------------------------
     // Each memory lies at a fixed spot on the life path and turns up when a scoop comes
     // close to it, so the demo is reproducible.
+    [Header("Finding the memories")]
+    [Tooltip("The first memory lies this far under the dig spot (m below the ground).")]
+    public float firstMemoryDepth = 1.7f;
+    [Tooltip("A scoop this close to the first memory brings it up.")]
+    public float firstMemoryReach = 1.5f;
+    [Tooltip("A scoop this close to any unfound memory brings up the next one in the story, in the hole.")]
+    public float memoryMagnet = 3f;
+
+    // Where a memory lies: the first right under the lit patch, the rest along the life path.
+    public Vector3 MemorySpot(int i) =>
+        i == 0 ? new Vector3(digSpot.x, -0.3f - firstMemoryDepth, digSpot.z) : path.PointAt(memories[i].pathDistance);
+
+    int NextMemory()
+    {
+        for (int i = 0; i < memories.Length; i++) if (memories[i] != null && !spawned[i]) return i;
+        return -1;
+    }
+
     void CheckFinds(Vector3 center, float radius)
     {
-        for (int i = 0; i < memories.Length; i++)
+        // The memories, in story order: a scoop near any unfound one brings up the next.
+        int next = NextMemory();
+        if (next >= 0)
         {
-            if (spawned[i] || memories[i] == null) continue;
-            Vector3 spot = path.PointAt(memories[i].pathDistance);
-            if ((spot - center).sqrMagnitude > (radius + findReach) * (radius + findReach)) continue;
-
-            spawned[i] = true;
-            int s = memories[i].stratum;
-            var prefab = memories[i].findPrefab != null ? memories[i].findPrefab
-                : findPrefabsByStratum != null && s < findPrefabsByStratum.Length && findPrefabsByStratum[s] != null
-                ? findPrefabsByStratum[s] : findPrefab;
-            liveFinds[i] = Unearth(prefab, memories[i], spot);
-            hud.ShowMessage("Something is buried here.", 4f);
-            return;   // one discovery per stroke
+            bool near = false;
+            for (int i = next; i < memories.Length && !near; i++)
+            {
+                if (memories[i] == null || spawned[i]) continue;
+                float reach = i == 0 ? firstMemoryReach : memoryMagnet;
+                near = (MemorySpot(i) - center).sqrMagnitude <= (radius + reach) * (radius + reach);
+            }
+            if (near)
+            {
+                spawned[next] = true;
+                int s = memories[next].stratum;
+                var prefab = memories[next].findPrefab != null ? memories[next].findPrefab
+                    : findPrefabsByStratum != null && s < findPrefabsByStratum.Length && findPrefabsByStratum[s] != null
+                    ? findPrefabsByStratum[s] : findPrefab;
+                liveFinds[next] = Surface(prefab, memories[next], center);
+                hud.ShowMessage("Something is buried here.", 4f);
+                return;   // one discovery per stroke
+            }
         }
 
         // Fragments: smaller things, between the memories.
@@ -294,6 +320,60 @@ public class DigGame : MonoBehaviour
         {
             Vector3 end = path.PointAt(path.Length - 0.6f);
             if ((end - center).sqrMagnitude <= (radius + findReach) * (radius + findReach)) SpawnBlankPage();
+        }
+    }
+
+    // A memory surfacing in the scoop just dug: it lies on the scoop's floor, like a mineral.
+    MemoryFind Surface(MemoryFind prefab, MemoryData data, Vector3 center)
+    {
+        Vector3 p = center;
+        for (int k = 0; k < 80 && !volume.Solid(p - Vector3.up * 0.05f); k++) p -= Vector3.up * 0.05f;
+        debris.Crumble(p + Vector3.up * 0.2f, volume.StratumAt(p));
+        var find = Instantiate(prefab, p, Quaternion.identity);
+        find.Init(data);
+        return find;
+    }
+
+    // After a memory's card (and letter) closes: for a few seconds a faint warm glow in
+    // the earth, in the direction of the next memory.
+    void HintNext()
+    {
+        int next = NextMemory();
+        if (next < 0) return;
+        Vector3 from = player.cam.position;
+        Vector3 dir = (MemorySpot(next) - from).normalized;
+        Vector3 at = Physics.Raycast(from, dir, out RaycastHit hit, 8f, AimMask, QueryTriggerInteraction.Ignore)
+            ? hit.point - dir * 0.05f : from + dir * 3f;
+        var go = new GameObject("Memory Hint");
+        go.transform.position = at;
+        var light = go.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.color = new Color(1f, 0.78f, 0.45f);
+        light.range = 1.6f;
+        light.intensity = 0f;
+        light.shadows = LightShadows.None;
+        if (minerals != null && minerals.glintPrefab != null)
+        {
+            var glint = Instantiate(minerals.glintPrefab, go.transform);
+            var main = glint.main;
+            main.startColor = new Color(1f, 0.85f, 0.6f);
+        }
+        hints.Add((light, 0f));
+    }
+    readonly List<(Light light, float time)> hints = new List<(Light, float)>();
+    bool hintPending;
+
+    void UpdateHints()
+    {
+        if (hintPending && !InputLocked) { hintPending = false; HintNext(); }
+        for (int i = hints.Count - 1; i >= 0; i--)
+        {
+            var (l, t) = hints[i];
+            if (l == null) { hints.RemoveAt(i); continue; }
+            t += Time.deltaTime;
+            l.intensity = 1.4f * Mathf.Clamp01(t / 0.8f) * Mathf.Clamp01((7f - t) / 1.5f) * (0.85f + 0.15f * Mathf.Sin(t * 3f));
+            if (t > 7f) { Destroy(l.gameObject); hints.RemoveAt(i); }
+            else hints[i] = (l, t);
         }
     }
 
@@ -466,6 +546,7 @@ public class DigGame : MonoBehaviour
         found[index] = true;
         shelf.Fill(index, find.Data);
         story.ShowCard(find.Data);
+        hintPending = true;   // once the card (and any letter) is closed, a glow toward the next
         return true;
     }
 
@@ -574,6 +655,7 @@ public class DigGame : MonoBehaviour
         }
         hud.SetStatus(depth, ShovelName, coins, bag.Count, shop != null ? shop.BagSize : 6);
         aimedMineral = minerals != null && !InputLocked ? minerals.Aim(new Ray(player.cam.position, player.cam.forward), player.reach + 0.4f) : null;
+        UpdateHints();
         string prompt = ShopPrompt();
         hud.SetPrompt(string.IsNullOrEmpty(prompt) && onSpot && !InputLocked ? digHint : prompt);
         if (atmosphere != null && shop != null) atmosphere.lanternPower = shop.LanternPower;

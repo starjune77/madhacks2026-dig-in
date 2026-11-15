@@ -170,10 +170,21 @@ public class DigShop : MonoBehaviour
     }
 
     // ---- Trading (public, so demo mode and tests can drive it) -------------------------
+    [Tooltip("Said the first time you sell, about where the memories are.")]
+    public string firstSale = "The warm soil remembers more.";
+    bool soldOnce;
+
+    string SoldLine(int coins)
+    {
+        string line = soldOnce ? Pick(onSell) : firstSale;
+        soldOnce = true;
+        return line + "  <alpha=#99>(+" + coins + " coins)";
+    }
+
     public void Sell()
     {
         int coins = game.SellBag(out int count);
-        Refresh(count == 0 ? Pick(onNothing) : Pick(onSell) + "  <alpha=#99>(+" + coins + " coins)");
+        Refresh(count == 0 ? Pick(onNothing) : SoldLine(coins));
         if (count > 0) DigAudio.I?.Mineral();
     }
 
@@ -190,7 +201,7 @@ public class DigShop : MonoBehaviour
         }
         game.coins += coins;
         if (count > 0) DigAudio.I?.Mineral();
-        Refresh(count == 0 ? Pick(onNothing) : Pick(onSell) + "  <alpha=#99>(+" + coins + " coins)");
+        Refresh(count == 0 ? Pick(onNothing) : SoldLine(coins));
     }
 
     public void BuySpade() => Buy(ref game.shovelLevel, spadePrices, () => game.shovel.SetLevel(game.shovelLevel));

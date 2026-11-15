@@ -14,7 +14,7 @@ public class DigMinerals : MonoBehaviour
     public DigPath path;
     public MineralData[] kinds;
     [Tooltip("A small sparkle, shown on each visible mineral.")]
-    public ParticleSystem glintPrefab;
+    public ParticleSystem glintPrefab;   // also used by DigGame's hint toward the next memory
 
     [Header("Where they lie")]
     public int seed = 1234;
