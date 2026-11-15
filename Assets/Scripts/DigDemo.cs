@@ -1,12 +1,22 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
-// Demo mode for judging. F12 toggles it; while it is on:
-//   F1  surface, Toy Shovel (start of Childhood)
-//   F2  start of School Days on the life path, Garden Shovel
-//   F3  start of Growing Up on the life path, Steel Shovel
+// Demo and review modes. F12 cycles: off -> Demo -> Review -> off (a badge shows which).
+//
+// Demo (for judging):
+//   F1  surface, Old Spade (start of Childhood)
+//   F2  start of School Days on the life path, Garden Spade
+//   F3  start of Growing Up on the life path, Steel Spade
 //   F4  the end of the path, next to the blank page (the ending)
 //   F5  the cat's shop, with a bag of stones to sell
+//
+// Review (to check every story moment): each jump reloads the scene, so it starts clean
+// and the same key replays the moment.
+//   F1-F9  memory 1-9, about one scoop away, with the right spade and every earlier memory
+//          found (so memories 3, 6 and 9 bring their letter after the card)
+//   F10    the shop counter, a full bag of mixed stones, coins for the next upgrade
+//   F11    the bottom of the path, facing the blank page (the whole ending)
 // Sits on "Game" next to DigGame.
 public class DigDemo : MonoBehaviour
 {
@@ -15,18 +25,45 @@ public class DigDemo : MonoBehaviour
     [Tooltip("Start with demo mode already on.")]
     public bool startInDemoMode;
 
-    bool demoMode;
+    enum Mode { Off, Demo, Review }
+    static Mode mode = Mode.Off;
+    static bool modeSet;
+    static int pendingReview = -1;   // survives the scene reload
 
     void Start()
     {
-        demoMode = startInDemoMode;
-        hud.SetDemo(demoMode);
+        if (!modeSet) { mode = startInDemoMode ? Mode.Demo : Mode.Off; modeSet = true; }
+        ShowBadge();
 
         // Built player, "-benchmark <log file>": visits the yard and each stratum, logs the
         // frame rate at each, and quits. Used to check a build launches and keeps 60 fps.
         var args = System.Environment.GetCommandLineArgs();
         int i = System.Array.IndexOf(args, "-benchmark");
         if (i >= 0) StartCoroutine(Benchmark(i + 1 < args.Length ? args[i + 1] : "benchmark.txt"));
+
+        if (pendingReview >= 0)
+        {
+            int jump = pendingReview;
+            pendingReview = -1;
+            StartCoroutine(ReviewAfterLoad(jump));
+        }
+    }
+
+    void ShowBadge()
+    {
+        hud.SetDemo(mode == Mode.Demo);
+        hud.SetReview(mode == Mode.Review);
+    }
+
+    System.Collections.IEnumerator ReviewAfterLoad(int jump)
+    {
+        // Let the ground, minerals and finds set themselves up first.
+        yield return null;
+        yield return new WaitForSecondsRealtime(0.3f);
+        game.GiveSpade();
+        if (jump < 9) game.ReviewMemory(jump);
+        else if (jump == 9) game.ReviewShop();
+        else game.DemoEnding();
     }
 
     System.Collections.IEnumerator Benchmark(string logPath)
@@ -49,6 +86,16 @@ public class DigDemo : MonoBehaviour
         Application.Quit();
     }
 
+    // Review: reload the scene and jump once it is up (0-8 memories, 9 shop, 10 ending).
+    public static void Review(int jump)
+    {
+        mode = Mode.Review;
+        modeSet = true;
+        pendingReview = jump;
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
     void Update()
     {
         var kb = Keyboard.current;
@@ -56,15 +103,27 @@ public class DigDemo : MonoBehaviour
 
         if (kb.f12Key.wasPressedThisFrame)
         {
-            demoMode = !demoMode;
-            hud.SetDemo(demoMode);
+            mode = mode == Mode.Off ? Mode.Demo : mode == Mode.Demo ? Mode.Review : Mode.Off;
+            ShowBadge();
         }
-        if (!demoMode || game.InputLocked) return;
+        // The review panel steps aside while the shop board is open (it covers Close).
+        hud.SetReview(mode == Mode.Review && !(game.shop != null && game.shop.IsOpen));
+        if (mode == Mode.Off) return;
 
-        if (kb.f1Key.wasPressedThisFrame) game.DemoJump(0);
-        else if (kb.f2Key.wasPressedThisFrame) game.DemoJump(1);
-        else if (kb.f3Key.wasPressedThisFrame) game.DemoJump(2);
-        else if (kb.f4Key.wasPressedThisFrame) game.DemoEnding();
-        else if (kb.f5Key.wasPressedThisFrame) game.DemoShop();
+        if (mode == Mode.Demo)
+        {
+            if (game.InputLocked) return;
+            if (kb.f1Key.wasPressedThisFrame) game.DemoJump(0);
+            else if (kb.f2Key.wasPressedThisFrame) game.DemoJump(1);
+            else if (kb.f3Key.wasPressedThisFrame) game.DemoJump(2);
+            else if (kb.f4Key.wasPressedThisFrame) game.DemoEnding();
+            else if (kb.f5Key.wasPressedThisFrame) game.DemoShop();
+            return;
+        }
+
+        // Review jumps reload the scene, so they work even over a card, a letter or the ending.
+        Key[] keys = { Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.F6, Key.F7, Key.F8, Key.F9, Key.F10, Key.F11 };
+        for (int k = 0; k < keys.Length; k++)
+            if (kb[keys[k]].wasPressedThisFrame) { Review(k); return; }
     }
 }

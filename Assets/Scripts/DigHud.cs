@@ -150,7 +150,7 @@ public class DigHud : MonoBehaviour
     // Hides the status corner, the crosshair and the badge (the bedroom at the end).
     public void SetHidden(bool hidden)
     {
-        foreach (var name in new[] { "Status", "Crosshair", "Prompt", "Demo Badge", "Controls" })
+        foreach (var name in new[] { "Status", "Crosshair", "Prompt", "Demo Badge", "Review Badge", "Controls" })
         {
             var t = transform.Find(name);
             if (t != null) t.gameObject.SetActive(!hidden);
@@ -160,6 +160,14 @@ public class DigHud : MonoBehaviour
     public void SetDemo(bool on)
     {
         if (demoGroup != null) demoGroup.alpha = on ? 1f : 0f;
+    }
+
+    [Header("Review mode panel")]
+    public CanvasGroup reviewGroup;
+
+    public void SetReview(bool on)
+    {
+        if (reviewGroup != null) reviewGroup.alpha = on ? 1f : 0f;
     }
 
     // 0 = clear, 1 = black.

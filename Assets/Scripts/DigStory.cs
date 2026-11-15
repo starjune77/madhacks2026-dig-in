@@ -57,6 +57,12 @@ public class DigStory : MonoBehaviour
     // click or E press is not also read as a dig or a workbench use).
     public bool Locked => mode != Mode.None || Time.frameCount <= unlockFrame;
 
+    // Review mode: the letters of strata before this one count as already read.
+    public void MarkLettersShown(int beforeStratum)
+    {
+        for (int s = 0; s < letterShown.Length && s < beforeStratum; s++) letterShown[s] = true;
+    }
+
     public void ShowCard(MemoryData data)
     {
         hud.ShowCard(data);

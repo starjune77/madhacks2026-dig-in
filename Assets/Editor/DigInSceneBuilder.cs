@@ -42,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v19 pick up";
+    const string HudVersion = "v20 review";
     const string HubVersion = "v7 munchkin";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
@@ -792,6 +792,16 @@ public static partial class DigInSceneBuilder
             "<b>DEMO</b>    F1 <alpha=#AA>Childhood<alpha=#FF>   F2 <alpha=#AA>School Days<alpha=#FF>   " +
             "F3 <alpha=#AA>Growing Up<alpha=#FF>   F4 <alpha=#AA>Ending<alpha=#FF>   F5 <alpha=#AA>Shop<alpha=#FF>",
             Vector2.zero, new Vector2(900f, 40f), stretch: true);
+
+        // Review mode panel, top right, hidden until F12 cycles to it.
+        var review = UiNode("Review Badge", root.transform, Vector2.one, Vector2.one, new Vector2(-40f, -32f), new Vector2(460f, 230f));
+        hud.reviewGroup = review.gameObject.AddComponent<CanvasGroup>();
+        hud.reviewGroup.alpha = 0f;
+        hud.reviewGroup.blocksRaycasts = false;
+        Text("Text", review, font, shadow, 21f, TextAlignmentOptions.TopRight,
+            "<b>REVIEW</b>\nF1-F9  <alpha=#AA>memory 1-9, one scoop away<alpha=#FF>\nF10  <alpha=#AA>the shop, a full bag<alpha=#FF>\n" +
+            "F11  <alpha=#AA>the blank page and the ending<alpha=#FF>\nF12  <alpha=#AA>review off",
+            Vector2.zero, new Vector2(460f, 230f), stretch: true);
 
         // Full-screen black on top of everything, for the ending's fade.
         var fade = UiNode("Fade", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);

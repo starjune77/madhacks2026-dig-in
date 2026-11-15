@@ -21,6 +21,18 @@ Other keys: **F1** back to the surface at the start, **R** up to the surface (an
 
 The first time you walk past the shop before digging, the cat watches the bare patch: "Something's under the soft ground, I think."
 
+## Review mode (checking every story moment)
+
+**F12** cycles: off, then **Demo** (the keys above), then **Review** (a small REVIEW panel at the top right lists the keys), then off. In Review mode each key reloads the scene, so the moment starts clean and pressing the same key replays it. It works in the Editor and in the build, even over an open card or letter.
+
+| Key | Moment |
+|---|---|
+| **F1-F9** | Memory 1-9, about one scoop away, with the right spade and every earlier memory already found. One dig brings the object up in the hole; click it for the card. Memories 3, 6 and 9 bring their letter right after the card. |
+| **F10** | The shop counter with a full bag of mixed stones and enough coins for the next upgrade (press **E**). |
+| **F11** | The bottom of the path facing the blank page: click it for the whole ending (the words, fade to black, the bedroom with the kitten asleep and purring, "Morning.", a click back to the yard with the full shelf). |
+
+How memories are found in normal play: the first lies 1.7 m under the lit patch; after that, any scoop within about 3 m of an unfound memory brings up the next one in the story, and after each card a faint warm glow in the earth points toward the next.
+
 Things to point out if asked:
 - Digging terrain: a density field meshed with marching cubes in Burst jobs, 4 m chunks with their own colliders; a flood fill removes floating earth after every scoop.
 - All art is realistic and sourced: Poly Haven scans (CC0), the Unity Terrain demo pack (SpeedTrees, grass), and Meshy models for the hero objects.

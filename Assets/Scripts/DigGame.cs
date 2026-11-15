@@ -437,6 +437,55 @@ public class DigGame : MonoBehaviour
         hud.ShowMessage("The shop. Press <b>E</b>.", 2f);
     }
 
+    // ---- Review mode (DigDemo; the scene is reloaded first, so state is clean) ----------
+    // Memory i about one scoop away, with the spade for its stratum and every earlier
+    // memory found (so the third of a stratum brings its letter, as in a real play-through).
+    public void ReviewMemory(int i)
+    {
+        if (i < 0 || i >= memories.Length || memories[i] == null) return;
+        for (int j = 0; j < i; j++)
+        {
+            if (memories[j] == null) continue;
+            found[j] = true;
+            spawned[j] = true;
+            shelf.Fill(j, memories[j]);
+        }
+        int stratum = memories[i].stratum;
+        story.MarkLettersShown(stratum);
+        SetShovel(stratum);
+        Vector3 spot = MemorySpot(i);
+        if (i == 0)
+        {
+            ReturnToSurface();
+            // A hole at the lit patch down to just above the bell: one more scoop finds it.
+            volume.CarveTunnel(new List<Vector3> { new Vector3(digSpot.x, 0.4f, digSpot.z), spot + Vector3.up * 1.3f }, 0.85f);
+            Vector3 stand = new Vector3(digSpot.x, 0.9f, digSpot.z - 1.7f);
+            player.Teleport(stand);
+            Vector3 to = spot - (stand + Vector3.up * DigPlayer.EyeHeight);
+            player.SetLook(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, Mathf.Clamp(-Mathf.Asin(to.normalized.y) * Mathf.Rad2Deg, -10f, 70f));
+        }
+        else
+        {
+            float d = memories[i].pathDistance;
+            for (int k = 0; k < fragments.Length; k++)
+                if (fragments[k] != null && fragments[k].pathDistance < d + 1f) fragmentSpawned[k] = true;
+            TunnelTo(d - 2.2f);
+            StandOnPath(d - 3.6f, 6f);
+        }
+        hud.ShowMessage("Memory " + (i + 1) + ": dig ahead", 2.5f);
+    }
+
+    // At the counter with a full bag of mixed stones and enough coins for the next upgrade.
+    public void ReviewShop()
+    {
+        DemoShop();
+        int next = 0;
+        if (shovelLevel + 1 < shop.spadePrices.Length) next = Mathf.Max(next, shop.spadePrices[shovelLevel + 1]);
+        if (bagLevel + 1 < shop.bagPrices.Length) next = Mathf.Max(next, shop.bagPrices[bagLevel + 1]);
+        if (lanternLevel + 1 < shop.lanternPrices.Length) next = Mathf.Max(next, shop.lanternPrices[lanternLevel + 1]);
+        coins = Mathf.Max(coins, next);
+    }
+
     // The end of the path with the blank page in front of you.
     public void DemoEnding()
     {
