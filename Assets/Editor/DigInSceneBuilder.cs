@@ -43,7 +43,7 @@ public static partial class DigInSceneBuilder
     const string ShelfVersion = "v4 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
     const string HudVersion = "v7 shop board";
-    const string HubVersion = "v4 realistic";         // marker child of scene/Surface Hub
+    const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
     const string PageVersion = "v1 page";
@@ -1054,10 +1054,11 @@ public static partial class DigInSceneBuilder
 
         Instance(shelfPrefab, hub, ShelfPos, 0f);
 
-        // The shop corner: the counter, facing the yard.
+        // The shop corner: the counter, facing the yard, and the cat sitting on it.
         var shop = new GameObject("Shop").transform;
         shop.SetParent(hub, false);
-        Instance(benchPrefab, shop, BenchPos, -90f);
+        var counter = Instance(benchPrefab, shop, BenchPos, -90f);
+        BuildShopCat(shop, counter);
     }
 
     static void WireGame(Scene scene, MemoryData[] memories, LetterData[] letters, GameObject[] findPrefabs)
