@@ -38,11 +38,11 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v10 softer lantern";
+    const string PlayerVersion = "v11 spade tiers";
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v11 mouse shop";
+    const string HudVersion = "v13 shop cards";
     const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
@@ -471,15 +471,16 @@ public static partial class DigInSceneBuilder
         pivot.localPosition = ShovelRestPos;
         pivot.localRotation = Quaternion.Euler(ShovelRestRot);
 
-        // One Kenney shovel per level, told apart by size and tint (stand-ins until the real shovel).
-        // The old spade (Meshy) for every level: shorter at first, full length later.
+        // The old spade (Meshy) for every level: shorter at first, full length later, and
+        // each tier a little cleaner and brighter on the blade (the shop shows the same).
         var spade = MeshyAsset("Spade", 0.3f);
+        var tiers = SpadeTierMaterials();
         shovel.models = new[]
         {
-            ShovelModel("Toy Shovel", pivot, spade, 0.5f),
-            ShovelModel("Garden Shovel", pivot, spade, 0.58f),
-            ShovelModel("Steel Shovel", pivot, spade, 0.66f),
-            ShovelModel("Fine Steel Shovel", pivot, spade, 0.72f),
+            ShovelModel("Old Spade", pivot, spade, 0.5f, tiers[0]),
+            ShovelModel("Garden Spade", pivot, spade, 0.58f, tiers[1]),
+            ShovelModel("Steel Spade", pivot, spade, 0.66f, tiers[2]),
+            ShovelModel("Fine Steel Spade", pivot, spade, 0.72f, tiers[3]),
         };
         for (int i = 1; i < shovel.models.Length; i++) shovel.models[i].SetActive(false);
 
@@ -512,12 +513,15 @@ public static partial class DigInSceneBuilder
 
     // DigShovel expects: origin = grip, handle along +Z to the blade. The Kenney shovel
     // stands along +Y with the grip at the bottom, so it is tipped forward 90 degrees.
-    static GameObject ShovelModel(string name, Transform parent, GameObject asset, float length)
+    static GameObject ShovelModel(string name, Transform parent, GameObject asset, float length, Material material)
     {
         var holder = new GameObject(name);
         holder.transform.SetParent(parent, false);
         if (asset == null) return holder;
         var model = (GameObject)PrefabUtility.InstantiatePrefab(asset, holder.transform);
+        if (material != null)
+            foreach (var r in model.GetComponentsInChildren<Renderer>())
+                r.sharedMaterials = r.sharedMaterials.Select(_ => material).ToArray();
         // The spade stands with its blade at the bottom: tip it back so the grip is at the
         // origin and the blade points along +Z, face up.
         model.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
@@ -1119,6 +1123,7 @@ public static partial class DigInSceneBuilder
         EditorUtility.SetDirty(game);
 
         if (shop.hud == null) shop.hud = game.hud;
+        BuildShopArt(shop, pendingMinerals);
         foreach (var l in Object.FindObjectsByType<DigLoosen>(FindObjectsInactive.Include))
         {
             l.volume = game.volume;

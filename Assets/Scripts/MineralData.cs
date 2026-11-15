@@ -16,4 +16,6 @@ public class MineralData : ScriptableObject
     [Tooltip("Longest side of the specimen, metres.")]
     public float size = 0.14f;
     public Color glint = new Color(1f, 0.95f, 0.85f);
+    [Tooltip("The shop's picture of it, rendered from the model (Assets/Textures/Shop).")]
+    public Sprite icon;
 }

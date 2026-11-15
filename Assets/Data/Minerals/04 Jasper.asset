@@ -19,3 +19,4 @@ MonoBehaviour:
   model: {fileID: 919132149155446097, guid: 325ad13d8b105ed4d96a6cf5b6f97301, type: 3}
   size: 0.14
   glint: {r: 1, g: 0.75, b: 0.6, a: 1}
+  icon: {fileID: 21300000, guid: 55d495e6f41348d4a876596e53b1a027, type: 3}

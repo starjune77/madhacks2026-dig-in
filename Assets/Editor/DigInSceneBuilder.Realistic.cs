@@ -117,13 +117,17 @@ public static partial class DigInSceneBuilder
 
         return RemapModel(fbx, slot =>
         {
-            // Match the FBX's material to a texture set by name; one set fits all.
+            // Match the FBX's material to a texture set by name: the same name first, then
+            // the longest set name inside the slot's, then any overlap; one set fits all.
             string best = diffs[0];
+            int bestScore = -1;
+            string s = slot.ToLowerInvariant();
             foreach (var d in diffs)
             {
                 string prefix = Path.GetFileName(d);
-                prefix = prefix.Substring(0, prefix.IndexOf("_diff_"));
-                if (slot.ToLowerInvariant().Contains(prefix.ToLowerInvariant()) || prefix.ToLowerInvariant().Contains(slot.ToLowerInvariant())) best = d;
+                prefix = prefix.Substring(0, prefix.IndexOf("_diff_")).ToLowerInvariant();
+                int score = s == prefix ? 10000 : s.Contains(prefix) ? prefix.Length : prefix.Contains(s) ? 0 : -1;
+                if (score > bestScore) { bestScore = score; best = d; }
             }
             return MaterialFor(best);
         });

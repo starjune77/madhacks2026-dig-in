@@ -62,21 +62,36 @@ public class DigHud : MonoBehaviour
     public CanvasGroup shopGroup;
     public TMP_Text shopCat;
     public TMP_Text shopCoins;
-    public TMP_Text shopEmpty;
-    [Tooltip("One row per kind of stone in the bag (unused rows are hidden).")]
-    public ShopRow[] shopRows;
-    public ShopRow shopSellAll;
-    [Tooltip("Spade, bag, lantern.")]
-    public ShopRow[] shopUpgrades;
+    [Tooltip("\"+12\" or \"-60\" beside the coins after a sale or a purchase.")]
+    public TMP_Text shopCoinsDelta;
     public Button shopClose;
+    public Button shopTabSell;
+    public Button shopTabBuy;
+    public GameObject shopSellPage;
+    public GameObject shopBuyPage;
+    public TMP_Text shopEmpty;
+    [Tooltip("One tile per kind of stone in the bag (unused tiles are hidden).")]
+    public ShopItem[] shopSellTiles;
+    public Button shopSellAll;
+    public TMP_Text shopSellTotal;
+    [Tooltip("One card per tier.")]
+    public ShopItem[] shopSpades;
+    public ShopItem[] shopBags;
+    public ShopItem[] shopLanterns;
 
+    // A tile or card on the price board.
     [System.Serializable]
-    public class ShopRow
+    public class ShopItem
     {
         public GameObject root;
-        public TMP_Text label;
+        public CanvasGroup group;
+        public Image image;
+        public TMP_Text title;
+        public TMP_Text detail;
+        public TMP_Text line;
         public Button button;
         public TMP_Text buttonLabel;
+        public TMP_Text stamp;
     }
 
     [Header("Demo mode badge")]
@@ -131,6 +146,37 @@ public class DigHud : MonoBehaviour
         if (depthText != null) depthText.text = depth.ToString("0.0") + " m";
         if (shovelText != null) shovelText.text = shovelName;
         if (scrapText != null) scrapText.text = coins + " coins    <alpha=#AA>bag " + bagCount + " / " + bagSize;
+    }
+
+    // The coins on the price board tick toward `coins`; a change shows as +n / -n.
+    public void SetShopCoins(int coins, bool instant)
+    {
+        if (instant || shownCoins < 0f) shownCoins = coins;
+        else if (coins != shopTarget && shopCoinsDelta != null)
+        {
+            int delta = coins - shopTarget;
+            shopCoinsDelta.text = (delta > 0 ? "+" : "−") + Mathf.Abs(delta);
+            deltaTimer = 2.6f;
+        }
+        shopTarget = coins;
+        UpdateCoins(0f);
+    }
+
+    float shownCoins = -1f;
+    int shopTarget;
+    float deltaTimer;
+
+    void UpdateCoins(float dt)
+    {
+        if (shopCoins == null) return;
+        float gap = Mathf.Abs(shopTarget - shownCoins);
+        shownCoins = Mathf.MoveTowards(shownCoins, shopTarget, dt * Mathf.Max(30f, gap * 3f));
+        shopCoins.text = Mathf.RoundToInt(shownCoins) + " <size=70%><alpha=#AA>coins";
+        if (shopCoinsDelta != null)
+        {
+            deltaTimer = Mathf.Max(0f, deltaTimer - dt);
+            shopCoinsDelta.alpha = Mathf.Clamp01(deltaTimer / 0.6f) * 0.85f;
+        }
     }
 
     // The cat's price board (DigShop fills it).
@@ -221,8 +267,10 @@ public class DigHud : MonoBehaviour
 
     void Update()
     {
-        float dt = Time.deltaTime;
+        // Unscaled: the pause menu stops time, but the HUD keeps fading.
+        float dt = Time.unscaledDeltaTime;
         time += dt;
+        if (shopVisible) UpdateCoins(dt);
 
         if (messageTimer > 0f) messageTimer -= dt;
         Fade(messageGroup, messageTimer > 0f);
@@ -245,6 +293,6 @@ public class DigHud : MonoBehaviour
     void Fade(CanvasGroup group, bool visible, float speedScale = 1f)
     {
         if (group == null) return;
-        group.alpha = Mathf.MoveTowards(group.alpha, visible ? 1f : 0f, fadeSpeed * speedScale * Time.deltaTime);
+        group.alpha = Mathf.MoveTowards(group.alpha, visible ? 1f : 0f, fadeSpeed * speedScale * Time.unscaledDeltaTime);
     }
 }

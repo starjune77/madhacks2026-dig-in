@@ -88,8 +88,9 @@ public static partial class DigInSceneBuilder
         var model = (GameObject)PrefabUtility.InstantiatePrefab(source, holder);
         model.transform.localPosition = Vector3.zero;
         model.transform.localRotation = Quaternion.identity;
-        foreach (var r in model.GetComponentsInChildren<Renderer>())
-            r.sharedMaterials = r.sharedMaterials.Select(_ => material).ToArray();
+        if (material != null)
+            foreach (var r in model.GetComponentsInChildren<Renderer>())
+                r.sharedMaterials = r.sharedMaterials.Select(_ => material).ToArray();
 
         var b = LocalBounds(holder);
         model.transform.localScale *= size / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.y, b.size.z));
@@ -103,81 +104,10 @@ public static partial class DigInSceneBuilder
     static Sprite RenderCard(GameObject source, Material material, string title, float yaw)
     {
         EnsureFolder(CardDir);
-        string path = CardDir + "/" + title + ".png";
-        var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-        if (existing != null) { Skipped(path); return existing; }
-
-        const int w = 960, h = 660;                      // the card's illustration box, 2x
-        var stage = new GameObject("Card Stage (temporary)");
-        stage.transform.position = new Vector3(0f, -500f, 0f);
-        var rt = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-        bool fog = RenderSettings.fog;
-        try
+        return RenderStill(CardDir + "/" + title + ".png", 960, 660, new Color(0.93f, 0.82f, 0.66f), holder =>   // the card's illustration box, 2x
         {
-            var holder = new GameObject("Model").transform;
-            holder.SetParent(stage.transform, false);
             holder.localRotation = Quaternion.Euler(0f, yaw, 0f);
             MeshyModel(source, holder, material, 1f);
-            var b = WorldBounds(holder.gameObject);
-
-            var camGo = new GameObject("Camera");
-            camGo.transform.SetParent(stage.transform, false);
-            var cam = camGo.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.93f, 0.82f, 0.66f);
-            cam.fieldOfView = 24f;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 50f;
-            cam.aspect = (float)w / h;
-            cam.targetTexture = rt;
-            var dir = Quaternion.Euler(24f, 205f, 0f) * Vector3.forward;   // from the front right, a little above
-            float radius = b.extents.magnitude;
-            cam.transform.position = b.center - dir * (radius / Mathf.Sin(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 0.8f);    // tight: the bounding sphere is generous
-            cam.transform.rotation = Quaternion.LookRotation(dir);
-
-            // A soft key light of its own, so the card does not depend on the scene's sun.
-            var keyGo = new GameObject("Key");
-            keyGo.transform.SetParent(stage.transform, false);
-            keyGo.transform.position = b.center - dir * radius * 2f + Vector3.up * radius * 2f + cam.transform.right * radius * 1.5f;
-            var key = keyGo.AddComponent<Light>();
-            key.type = LightType.Point;
-            key.color = new Color(1f, 0.96f, 0.9f);
-            key.range = radius * 12f;
-            key.intensity = 0.8f;
-            key.shadows = LightShadows.None;
-
-            RenderSettings.fog = false;
-            float ambient = RenderSettings.ambientIntensity;
-            RenderSettings.ambientIntensity = 0.7f;   // the scene's sky would wash the card out
-            var request = new RenderPipeline.StandardRequest { destination = rt };
-            if (RenderPipeline.SupportsRenderRequest(cam, request)) RenderPipeline.SubmitRenderRequest(cam, request);
-            else cam.Render();
-
-            var previous = RenderTexture.active;
-            RenderTexture.active = rt;
-            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-            tex.Apply();
-            RenderTexture.active = previous;
-            File.WriteAllBytes(path, tex.EncodeToPNG());
-            Object.DestroyImmediate(tex);
-            cam.targetTexture = null;
-        }
-        finally
-        {
-            RenderSettings.fog = fog;
-            RenderSettings.ambientIntensity = 1.3f;
-            RenderTexture.ReleaseTemporary(rt);
-            Object.DestroyImmediate(stage);
-        }
-
-        AssetDatabase.ImportAsset(path);
-        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
-        importer.textureType = TextureImporterType.Sprite;
-        importer.spriteImportMode = SpriteImportMode.Single;
-        importer.mipmapEnabled = true;
-        importer.SaveAndReimport();
-        Created(path);
-        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }, Quaternion.Euler(24f, 205f, 0f), 0.8f);   // from the front right, a little above; tight: the bounding sphere is generous
     }
 }
