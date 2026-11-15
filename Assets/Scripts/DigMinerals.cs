@@ -54,6 +54,8 @@ public class DigMinerals : MonoBehaviour
         public MineralData kind;
         public GameObject shown;     // the specimen in the wall, while near
         public Rigidbody loose;      // after it popped out
+        public Vector3 poppedAt;     // where it came out (open air), to catch it if it slips through
+        public float poppedTime;
         public bool taken;
     }
 
@@ -106,6 +108,7 @@ public class DigMinerals : MonoBehaviour
         return s.kind;
     }
     Vector3 liftTarget;
+    float looseTimer;
 
     void UpdateHighlight()
     {
@@ -196,7 +199,10 @@ public class DigMinerals : MonoBehaviour
         if (dryScoops < (foundAny ? pityScoops[stratum] : firstFindScoops)) return;
         dryScoops = 0;
         foundAny = true;
-        Grant(center - toward.normalized * radius * 0.3f, toward, volume.StratumAt(center));
+        // In the open air of the fresh scoop, a little toward the player (never inside the earth).
+        Vector3 at = center + toward.normalized * radius * 0.25f;
+        if (volume.Solid(at)) at = center;
+        Grant(at, toward, volume.StratumAt(center));
     }
 
     // A mineral of this stratum's kinds, out of the scoop just made.
@@ -220,6 +226,10 @@ public class DigMinerals : MonoBehaviour
     void PopOut(Spot s, Vector3 toward)
     {
         if (s.shown == null) Show(s);
+        // Out into the open: a stone still inside the earth would sink through it.
+        Vector3 c = Bounds(s.shown).center, p = c, dir = toward.sqrMagnitude > 0.0001f ? toward.normalized : Vector3.up;
+        for (int k = 0; k < 24 && volume.Solid(p); k++) p += dir * 0.1f;
+        s.shown.transform.position += p - c;
         var body = s.shown.AddComponent<Rigidbody>();
         body.mass = 0.3f;
         body.linearDamping = 0.2f;
@@ -235,6 +245,8 @@ public class DigMinerals : MonoBehaviour
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         body.angularVelocity = Random.insideUnitSphere * 6f;
         s.loose = body;
+        s.poppedAt = Bounds(s.shown).center;
+        s.poppedTime = Time.time;
         loose.Add(s);
     }
 
@@ -292,12 +304,38 @@ public class DigMinerals : MonoBehaviour
             }
         }
 
-        // Loose minerals rest where they fell until picked up; any that fall out of the world go.
+        // Loose minerals rest where they fell until picked up.
+        looseTimer -= Time.deltaTime;
+        bool looseCheck = looseTimer <= 0f;
+        if (looseCheck) looseTimer = 0.25f;
         for (int i = loose.Count - 1; i >= 0; i--)
         {
             var s = loose[i];
             if (s.shown == null) { loose.RemoveAt(i); continue; }
-            if (s.shown.transform.position.y < DigVolume.Min.y - 2f) { s.taken = true; Destroy(s.shown); loose.RemoveAt(i); }
+            // Earth tossed onto a resting stone (heaps), or fresh ground swapping its collider,
+            // can leave it inside the soil, where it would sink. It comes up to the surface
+            // of that earth instead, so a find is never lost.
+            // Once it has come to rest it stays put (no physics): the ground under it is rebuilt
+            // with every scoop nearby, and a sleeping body can drop through a swapped collider.
+            if (s.loose != null && looseCheck)
+            {
+                var body = s.loose;
+                Vector3 c = Bounds(s.shown).center, p = c;
+                if (c.y < s.poppedAt.y - 2.5f) p = s.poppedAt;
+                for (int k = 0; k < 40 && volume.Solid(p); k++) p += Vector3.up * 0.05f;
+                if (p != c)
+                {
+                    body.isKinematic = true;
+                    body.position += p - c + Vector3.up * 0.02f;
+                }
+                else if (!body.isKinematic && Time.time - s.poppedTime > 0.8f && body.linearVelocity.sqrMagnitude < 0.01f)
+                    body.isKinematic = true;
+                else if (body.isKinematic && !Physics.Raycast(c, Vector3.down, s.kind.size * sizeScale * 0.5f + 0.12f, DigGame.AimMask, QueryTriggerInteraction.Ignore))
+                {
+                    body.isKinematic = false;   // the ground under it was dug away: it falls again
+                    body.WakeUp();
+                }
+            }
         }
 
         // The soft light on the aimed one pulses gently.
