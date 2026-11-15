@@ -26,6 +26,11 @@ public class DigMinerals : MonoBehaviour
     public int strays = 60;
 
     [Header("Showing and picking up")]
+    [Tooltip("Every specimen is this many times its kind's size, so it reads from 2-3 m away.")]
+    public float sizeScale = 2f;
+    [Tooltip("Glint: bigger and more frequent sparkles than the prefab's.")]
+    public float glintSize = 1.8f;
+    public float glintRate = 1.6f;
     public float showDistance = 5f;
     public float pickupDistance = 1.3f;
     [Tooltip("A scoop frees a mineral within its radius plus this much.")]
@@ -63,7 +68,7 @@ public class DigMinerals : MonoBehaviour
             float along = Vector3.Dot(to, ray.direction);
             if (along < 0.2f || along > reach) continue;
             float off = (to - ray.direction * along).magnitude;
-            float allowed = 0.12f + s.kind.size * 0.6f + along * 0.04f;   // a forgiving cone
+            float allowed = 0.12f + s.kind.size * sizeScale * 0.6f + along * 0.04f;   // a forgiving cone
             if (off > allowed || off / allowed + along * 0.01f > best) continue;
             best = off / allowed + along * 0.01f;
             aimed = s;
@@ -176,7 +181,7 @@ public class DigMinerals : MonoBehaviour
         // Sized in world metres: the model's own units can be anything (a 0.5-unit sphere
         // on a Meshy model was 3 m across and choked the physics).
         var col = s.shown.AddComponent<SphereCollider>();
-        col.radius = s.kind.size * 0.4f / Mathf.Max(0.0001f, s.shown.transform.lossyScale.x);
+        col.radius = s.kind.size * sizeScale * 0.4f / Mathf.Max(0.0001f, s.shown.transform.lossyScale.x);
         col.center = s.shown.transform.InverseTransformPoint(Bounds(s.shown).center);
         int layer = LayerMask.NameToLayer("Debris");
         if (layer >= 0) s.shown.layer = layer;
@@ -192,7 +197,7 @@ public class DigMinerals : MonoBehaviour
         var go = Instantiate(s.kind.model, s.position, s.rotation, transform);
         go.name = s.kind.title;
         var b = Bounds(go);
-        float scale = s.kind.size / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.y, b.size.z));
+        float scale = s.kind.size * sizeScale / Mathf.Max(0.001f, Mathf.Max(b.size.x, b.size.y, b.size.z));
         go.transform.localScale *= scale;
         b = Bounds(go);
         go.transform.position += s.position - b.center;
@@ -204,6 +209,10 @@ public class DigMinerals : MonoBehaviour
             glint.transform.localScale = Vector3.one / Mathf.Max(0.001f, scale);
             var main = glint.main;
             main.startColor = s.kind.glint;
+            main.startSizeMultiplier *= glintSize;
+            main.maxParticles = 6;
+            var emission = glint.emission;
+            emission.rateOverTimeMultiplier *= glintRate;
         }
         s.shown = go;
     }
