@@ -16,5 +16,6 @@ MonoBehaviour:
   line: I folded the paper before anyone could see the number at the top.
   pathDistance: 31
   stratum: 1
-  card: {fileID: 0}
-  findPrefab: {fileID: 0}
+  card: {fileID: 21300000, guid: eade74828f9074d48ae852ac5db75de2, type: 3}
+  findPrefab: {fileID: 5798429144389602798, guid: 7e2e768fec81ad542a916b5bb43d3f22, type: 3}
+  fragment: 0

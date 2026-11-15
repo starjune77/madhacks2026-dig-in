@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8406547940c54967a372aaa582a1841a, type: 3}
+  m_Name: 01 food_apple_01
+  m_EditorClassIdentifier: Assembly-CSharp::MemoryData
+  title: food_apple_01
+  line: Packed in my lunch every day. I traded it every day.
+  pathDistance: 4
+  stratum: 0
+  card: {fileID: 0}
+  findPrefab: {fileID: 2294678503119984159, guid: 62b9b3169acba124f8d6cb44da39f594, type: 3}
+  fragment: 1

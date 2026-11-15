@@ -42,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v4 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v7 shop board";
+    const string HudVersion = "v8 demo shop";
     const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
@@ -770,12 +770,12 @@ public static partial class DigInSceneBuilder
         BuildEndingUi(root.transform, hud, italic);
 
         // Demo mode badge, top right, hidden until F12.
-        var demo = UiNode("Demo Badge", root.transform, Vector2.one, Vector2.one, new Vector2(-40f, -32f), new Vector2(900f, 40f));
+        var demo = UiNode("Demo Badge", root.transform, Vector2.one, Vector2.one, new Vector2(-40f, -32f), new Vector2(1100f, 40f));
         hud.demoGroup = demo.gameObject.AddComponent<CanvasGroup>();
         hud.demoGroup.alpha = 0f;
         Text("Text", demo, font, shadow, 20f, TextAlignmentOptions.TopRight,
             "<b>DEMO</b>    F1 <alpha=#AA>Childhood<alpha=#FF>   F2 <alpha=#AA>School Days<alpha=#FF>   " +
-            "F3 <alpha=#AA>Growing Up<alpha=#FF>   F4 <alpha=#AA>Ending<alpha=#FF>",
+            "F3 <alpha=#AA>Growing Up<alpha=#FF>   F4 <alpha=#AA>Ending<alpha=#FF>   F5 <alpha=#AA>Shop<alpha=#FF>",
             Vector2.zero, new Vector2(900f, 40f), stretch: true);
 
         // Full-screen black on top of everything, for the ending's fade.
@@ -1096,6 +1096,14 @@ public static partial class DigInSceneBuilder
         var hub = FindRoot(scene, "Surface Hub");
         if (game.spawnPoint == null && hub != null) game.spawnPoint = hub.Find("Spawn Point");
         if (game.memories == null || game.memories.Length == 0) game.memories = memories;
+        var lifePath = Find<DigPath>(scene);
+        var vol = Find<DigVolume>(scene);
+        game.fragments = BuildFragments(d =>
+        {
+            if (lifePath == null || vol == null) return 0;
+            lifePath.Bake();
+            return vol.StratumAt(lifePath.PointAt(d));
+        });
         if (game.findPrefab == null) game.findPrefab = findPrefabs[0].GetComponent<MemoryFind>();
         if (game.findPrefabsByStratum == null || game.findPrefabsByStratum.Length == 0)
             game.findPrefabsByStratum = findPrefabs.Select(f => f.GetComponent<MemoryFind>()).ToArray();

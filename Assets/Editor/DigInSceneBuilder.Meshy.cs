@@ -14,12 +14,19 @@ public static partial class DigInSceneBuilder
 {
     const string MeshyDir = "Assets/ThirdParty/Meshy";
     const string CardDir = "Assets/Textures/Cards";
-    const string MeshyFindVersion = "v2 meshy find";
+    const string MeshyFindVersion = "v3 realistic find";
 
     static void BuildMeshyFinds(MemoryData[] memories)
     {
-        // memory index, asset folder, longest side in metres, yaw so its best side faces the card camera
-        MeshyFind(memories[0], "BicycleBell", 0.55f, 0f);
+        // asset folder and longest side (m) per memory, in shelf order
+        var defs = new (string folder, float size)[]
+        {
+            ("BicycleBell", 0.2f), ("Crayon", 0.16f), ("ToyCar", 0.22f),
+            ("TestPaper", 0.26f), ("Eraser", 0.12f), ("FoldedNote", 0.14f),
+            ("HouseKey", 0.16f), ("TrainTicket", 0.18f), ("CoffeeMug", 0.16f),
+        };
+        for (int i = 0; i < memories.Length && i < defs.Length; i++)
+            MeshyFind(memories[i], defs[i].folder, defs[i].size, 0f);
     }
 
     static void MeshyFind(MemoryData data, string asset, float size, float cardYaw)
@@ -32,8 +39,8 @@ public static partial class DigInSceneBuilder
             return;
         }
 
-        var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(MeshyDir + "/" + asset + "/" + asset + "_base_color.png");
-        var material = Mat("Meshy " + asset, Color.white, 0.12f, 0f, texture);
+        source = MeshyAsset(asset, 0.3f);
+        var material = AssetDatabase.LoadAssetAtPath<Material>(ModelMatDir + "/Meshy " + asset + ".mat");
 
         string prefabPath = PrefabDir + "/Find " + data.title + ".prefab";
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
@@ -61,8 +68,8 @@ public static partial class DigInSceneBuilder
             var glow = glowGo.AddComponent<Light>();
             glow.type = LightType.Point;
             glow.color = new Color(1f, 0.88f, 0.62f);
-            glow.range = 2.4f;
-            glow.intensity = 0.9f;
+            glow.range = 1.6f;
+            glow.intensity = 0.6f;
             glow.shadows = LightShadows.None;
             prefab = SavePrefab(root, prefabPath);
         }
@@ -125,7 +132,7 @@ public static partial class DigInSceneBuilder
             cam.targetTexture = rt;
             var dir = Quaternion.Euler(24f, 205f, 0f) * Vector3.forward;   // from the front right, a little above
             float radius = b.extents.magnitude;
-            cam.transform.position = b.center - dir * (radius / Mathf.Sin(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 0.66f);   // tight: the bounding sphere is generous
+            cam.transform.position = b.center - dir * (radius / Mathf.Sin(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 0.8f);    // tight: the bounding sphere is generous
             cam.transform.rotation = Quaternion.LookRotation(dir);
 
             // A soft key light of its own, so the card does not depend on the scene's sun.
@@ -136,10 +143,12 @@ public static partial class DigInSceneBuilder
             key.type = LightType.Point;
             key.color = new Color(1f, 0.96f, 0.9f);
             key.range = radius * 12f;
-            key.intensity = 2.2f;
+            key.intensity = 0.8f;
             key.shadows = LightShadows.None;
 
             RenderSettings.fog = false;
+            float ambient = RenderSettings.ambientIntensity;
+            RenderSettings.ambientIntensity = 0.7f;   // the scene's sky would wash the card out
             var request = new RenderPipeline.StandardRequest { destination = rt };
             if (RenderPipeline.SupportsRenderRequest(cam, request)) RenderPipeline.SubmitRenderRequest(cam, request);
             else cam.Render();
@@ -157,6 +166,7 @@ public static partial class DigInSceneBuilder
         finally
         {
             RenderSettings.fog = fog;
+            RenderSettings.ambientIntensity = 1.3f;
             RenderTexture.ReleaseTemporary(rt);
             Object.DestroyImmediate(stage);
         }

@@ -16,5 +16,6 @@ MonoBehaviour:
   line: It just said, 'Meet me after class.' I kept checking the clock.
   pathDistance: 49
   stratum: 1
-  card: {fileID: 0}
-  findPrefab: {fileID: 0}
+  card: {fileID: 21300000, guid: 315670ad42bc5f34b96df3f2ac8ee077, type: 3}
+  findPrefab: {fileID: 106592835181109220, guid: 84400700e71633248a74d75dfd8c6fc1, type: 3}
+  fragment: 0

@@ -16,5 +16,6 @@ MonoBehaviour:
   line: I drew a house with four windows. The real house only had two.
   pathDistance: 14
   stratum: 0
-  card: {fileID: 0}
-  findPrefab: {fileID: 0}
+  card: {fileID: 21300000, guid: 3da11ffff2035b840a761492e2b13668, type: 3}
+  findPrefab: {fileID: 9102488338302088415, guid: ea5af9807fe2823408d436e9ca362922, type: 3}
+  fragment: 0

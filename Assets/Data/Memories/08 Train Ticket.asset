@@ -16,5 +16,6 @@ MonoBehaviour:
   line: I watched the platform disappear, even after there was nothing left to see.
   pathDistance: 68
   stratum: 2
-  card: {fileID: 0}
-  findPrefab: {fileID: 0}
+  card: {fileID: 21300000, guid: 109aa45296147924a8f7af483607cb2c, type: 3}
+  findPrefab: {fileID: 1870068672223431195, guid: 67ec7b58dc1c7dd46abb8a988e87c212, type: 3}
+  fragment: 0

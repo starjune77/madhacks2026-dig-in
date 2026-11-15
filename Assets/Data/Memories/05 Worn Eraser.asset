@@ -16,5 +16,6 @@ MonoBehaviour:
   line: We kept borrowing this from each other, even though the teacher had a whole box.
   pathDistance: 40
   stratum: 1
-  card: {fileID: 0}
-  findPrefab: {fileID: 0}
+  card: {fileID: 21300000, guid: bc3af341309581744a2b7c73b13283f8, type: 3}
+  findPrefab: {fileID: 5497837382419748030, guid: 552ee4e1dca89334c894e49e5adc386d, type: 3}
+  fragment: 0

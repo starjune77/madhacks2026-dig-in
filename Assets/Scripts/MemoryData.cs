@@ -15,4 +15,6 @@ public class MemoryData : ScriptableObject
     public Sprite card;
     [Tooltip("This memory's own object in the dirt. Empty = the stratum's stand-in.")]
     public MemoryFind findPrefab;
+    [Tooltip("A small fragment: only its line is shown when picked up; no card, no shelf.")]
+    public bool fragment;
 }

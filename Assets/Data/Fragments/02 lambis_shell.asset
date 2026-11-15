@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8406547940c54967a372aaa582a1841a, type: 3}
+  m_Name: 02 lambis_shell
+  m_EditorClassIdentifier: Assembly-CSharp::MemoryData
+  title: lambis_shell
+  line: We held it to our ears to hear the sea. It only ever sounded like the hallway.
+  pathDistance: 10.5
+  stratum: 0
+  card: {fileID: 0}
+  findPrefab: {fileID: 6136170609647220443, guid: 658590edcfe273847a84210e341a929b, type: 3}
+  fragment: 1

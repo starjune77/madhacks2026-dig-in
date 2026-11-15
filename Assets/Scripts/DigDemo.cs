@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 //   F2  start of School Days on the life path, Garden Shovel
 //   F3  start of Growing Up on the life path, Steel Shovel
 //   F4  the end of the path, next to the blank page (the ending)
+//   F5  the cat's shop, with a bag of stones to sell
 // Sits on "Game" next to DigGame.
 public class DigDemo : MonoBehaviour
 {
@@ -38,5 +39,6 @@ public class DigDemo : MonoBehaviour
         else if (kb.f2Key.wasPressedThisFrame) game.DemoJump(1);
         else if (kb.f3Key.wasPressedThisFrame) game.DemoJump(2);
         else if (kb.f4Key.wasPressedThisFrame) game.DemoEnding();
+        else if (kb.f5Key.wasPressedThisFrame) game.DemoShop();
     }
 }

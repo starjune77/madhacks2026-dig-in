@@ -43,6 +43,8 @@ public class DigGame : MonoBehaviour
     public MemoryFind findPrefab;
     [Tooltip("Optional find prefab per stratum; empty entries use findPrefab.")]
     public MemoryFind[] findPrefabsByStratum;
+    [Tooltip("Small memory fragments between the major ones (lines only, never on the shelf).")]
+    public MemoryData[] fragments = new MemoryData[0];
     [Tooltip("A memory turns up when a scoop comes this close to its spot (m, beyond the scoop itself).")]
     public float findReach = 0.8f;
 
@@ -74,6 +76,7 @@ public class DigGame : MonoBehaviour
 
     bool[] spawned;
     bool[] found;
+    bool[] fragmentSpawned;
     bool pageSpawned;
     MemoryFind[] liveFinds;
     int lastStratum;
@@ -93,6 +96,7 @@ public class DigGame : MonoBehaviour
         AimMask = mask;
 
         spawned = new bool[memories.Length];
+        fragmentSpawned = new bool[fragments.Length];
         found = new bool[memories.Length];
         liveFinds = new MemoryFind[memories.Length];
     }
@@ -237,6 +241,18 @@ public class DigGame : MonoBehaviour
             return;   // one discovery per stroke
         }
 
+        // Fragments: smaller things, between the memories.
+        for (int i = 0; i < fragments.Length; i++)
+        {
+            var f = fragments[i];
+            if (fragmentSpawned[i] || f == null || f.findPrefab == null) continue;
+            Vector3 spot = path.PointAt(f.pathDistance);
+            if ((spot - center).sqrMagnitude > (radius + findReach) * (radius + findReach)) continue;
+            fragmentSpawned[i] = true;
+            Unearth(f.findPrefab, f, spot);
+            return;
+        }
+
         // At the very end of the path, a blank page.
         if (!pageSpawned && blankPagePrefab != null)
         {
@@ -286,6 +302,23 @@ public class DigGame : MonoBehaviour
         hud.ShowMessage(StratumNames[stratum], 2f);
     }
 
+    // In front of the cat's counter with a bag of stones to sell.
+    public void DemoShop()
+    {
+        ReturnToSurface();
+        bag.Clear();
+        if (minerals != null && minerals.kinds.Length > 0)
+            for (int i = 0; i < (shop != null ? shop.BagSize : 6); i++) bag.Add(minerals.kinds[(i * 3 + 1) % minerals.kinds.Length]);
+        if (workbench != null && workbench.interactPoint != null)
+        {
+            Vector3 p = workbench.interactPoint.position;
+            Vector3 toCounter = workbench.transform.position - p;
+            player.Teleport(new Vector3(p.x, spawnPoint.position.y, p.z));
+            player.SetLook(Mathf.Atan2(toCounter.x, toCounter.z) * Mathf.Rad2Deg, 12f);
+        }
+        hud.ShowMessage("The shop. Press <b>E</b>.", 2f);
+    }
+
     // The end of the path with the blank page in front of you.
     public void DemoEnding()
     {
@@ -323,6 +356,8 @@ public class DigGame : MonoBehaviour
 
     void SkipMemoriesBefore(float distance)
     {
+        for (int i = 0; i < fragments.Length; i++)
+            if (fragments[i] != null && fragments[i].pathDistance < distance) fragmentSpawned[i] = true;
         for (int i = 0; i < memories.Length; i++)
         {
             if (memories[i] == null || memories[i].pathDistance >= distance) continue;
@@ -373,6 +408,14 @@ public class DigGame : MonoBehaviour
         {
             Destroy(find.gameObject);
             story.PlayEnding();
+            return true;
+        }
+
+        if (find.Data.fragment)
+        {
+            Destroy(find.gameObject);
+            DigAudio.I?.Page();
+            hud.ShowMessage("<i>" + find.Data.line + "</i>", 5f);
             return true;
         }
 
