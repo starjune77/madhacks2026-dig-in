@@ -21,6 +21,32 @@ public class DigDemo : MonoBehaviour
     {
         demoMode = startInDemoMode;
         hud.SetDemo(demoMode);
+
+        // Built player, "-benchmark <log file>": visits the yard and each stratum, logs the
+        // frame rate at each, and quits. Used to check a build launches and keeps 60 fps.
+        var args = System.Environment.GetCommandLineArgs();
+        int i = System.Array.IndexOf(args, "-benchmark");
+        if (i >= 0) StartCoroutine(Benchmark(i + 1 < args.Length ? args[i + 1] : "benchmark.txt"));
+    }
+
+    System.Collections.IEnumerator Benchmark(string logPath)
+    {
+        var log = new System.Text.StringBuilder();
+        log.AppendLine("DigIn benchmark " + System.DateTime.Now + "  " + Screen.width + "x" + Screen.height + "  " + SystemInfo.graphicsDeviceName);
+        string[] names = { "yard vista", "School Days tunnel", "Growing Up tunnel", "the shop", "the end of the path" };
+        for (int step = 0; step < names.Length; step++)
+        {
+            if (step == 1) game.DemoJump(1);
+            else if (step == 2) game.DemoJump(2);
+            else if (step == 3) game.DemoShop();
+            else if (step == 4) game.DemoEnding();
+            yield return new WaitForSeconds(2f);   // settle: shaders, streaming
+            int frames = 0; float time = 0f, worst = 0f;
+            while (time < 5f) { yield return null; frames++; time += Time.unscaledDeltaTime; worst = Mathf.Max(worst, Time.unscaledDeltaTime); }
+            log.AppendLine(names[step] + ": " + (frames / time).ToString("0") + " fps average, worst frame " + (worst * 1000f).ToString("0.0") + " ms");
+        }
+        System.IO.File.WriteAllText(logPath, log.ToString());
+        Application.Quit();
     }
 
     void Update()

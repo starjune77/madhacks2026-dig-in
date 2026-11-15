@@ -28,36 +28,25 @@ Underneath, the world is not quite the real one. It is a dream, or something lik
 - Three strata, by depth: Childhood (soft warm dirt) -> School Days (clay) -> Growing Up (stone). "Today" is at the end of the path.
 - **Economy: dig -> find minerals -> carry them up -> sell at the shop -> buy upgrades.** 15-20 real mineral types (quartz, feldspar, mica, garnet, jasper, malachite, amethyst, opal...) with rarity and value by depth and stratum, embedded in the walls, popping out when dug, with a small glint. Each has a one-line description that quietly echoes a moment of life ("Quartz: clear, like the mornings before school."), subtle, never preachy.
 - A bag with limited capacity, so the player goes back up to sell. R takes you up and back down.
-- Shop upgrades: 4-5 shovel tiers (each faster and able to dig harder strata), bag capacity, a brighter lantern. Prices tuned so the full journey takes 25-35 minutes.
+- Shop upgrades: four spade tiers (one model, scaled: Old, Garden, Steel, Fine Steel; each digs a harder stratum or digs faster), bag capacity, a brighter lantern. Prices tuned so the full journey takes 25-35 minutes.
 - **The shop is run by a cat**: the protagonist's own pet, a real cat shape (not humanoid), small and round, warm colours, sitting on a counter or crate near the house. Realistic but soft. Idle, tail swish, blink and purr/stretch animations. The shop UI is simple and warm, like a hand-written price board; the cat says short lines when you sell or buy.
 - Memories, fragments and letters are never sold.
 - Nine major memory objects, three per stratum, at fixed points on the path (not random) so the demo is reproducible. Between them, 15-20 small memory fragments (a marble, a bottle cap, a hair tie, a bus pass...), each with one short line in the same quiet tone. A few small open pockets along the way, each holding something.
 - Picking up a major object shows a card with its illustration and a one-line memory. A fragment only shows its line.
 - One letter per stratum (three total). A shelf at the surface fills up with the cards you have found.
 - **The dream frame**, hinted softly and never stated until the end: the yard feels familiar but slightly unreal, no other people exist, the light is a little too golden, the cat sometimes says things a cat could not know.
-- Ending: at the end of the path you find a blank page. The ending text appears, you return to the surface, and the shelf is full. How the dream frame and the cat pay off at the end is **not decided yet**: two options will be proposed, and nothing changes until the developer chooses.
+- Ending (chosen by the developer): at the end of the path you find a blank page; its text appears; fade to black; you wake up in bed in the morning with the family cat curled up asleep on your chest, purring. One line: "Morning." A click returns to the yard, where the shelf is full.
 - The shovel is only a tool for going further. The real reward is the memories.
 - The game starts like an ordinary digging game. The meaning should dawn on the player gradually.
 - **Realistic art direction**: photoreal quality close to modern realistic indie simulator games, warm, calm and nostalgic (golden hour, soft haze, warm grade). Never cold or gritty. No low-poly assets anywhere; do not mix styles. Every Kenney asset leaves the scene.
 - **Sound**: natural, soft and gentle; recorded foley, never synthetic or procedural; a quiet, calm mix.
 - Out: scrap, the workbench, the Kenney low-poly look. Also out of scope: third-person view, Databricks integration, complex inventory.
 
-## Plan (2026-11-14 evening, branch `overhaul`)
+## Status (2026-11-15 morning)
 
-The low-poly, straight-shaft version was play-tested and rejected; so was the first overhaul's floating soil and pebble-like clods. References for feel, guidance and mood (ideas only, never assets or exact designs): A Game About Digging A Hole, Astroneer, What Remains of Edith Finch, modern simulator games with physical piles of small objects.
+Everything in the locked design is implemented on `overhaul` (merged into `main` for submission): volumetric digging, no floating soil, crumbly clods and heaps, photoscanned ground, the realistic yard (HDRI, SpeedTrees, real grass, Meshy house and fence, Poly Haven props), minerals and the cat's shop, realistic memory objects with card art, sixteen fragments, sound, the dream hints and the waking ending. Not yet play-tested by the developer; feel and pacing (25-35 minutes) are untested estimates.
 
-Already done on `overhaul`: volumetric terrain (density field, marching cubes, Burst, a collider per chunk), the life path, the animated swing with hit-stop, scoops that grow and crumble, the aim ring.
-
-Order. Screenshot and check after each step, commit after each working step, **stop for a developer play-test after steps 1, 2 and 4**:
-
-1. **Soil** - no floating soil (islands and slivers collapse into falling clods); crumbly clods in the ground's material that break on landing and settle into heaps; photoscanned CC0 soil, clay and rock, triplanar, matte, blended by stratum, dug earth darker and moister. `[done, awaiting play-test]`
-2. **Realistic graphics** - first one vista (the view from the spawn point across the backyard), then stop for approval; then the dig area, tunnels and shop corner. HDRI sky and light, Unity Terrain with photoscanned layers and dense grass, realistic trees, rocks and props (Poly Haven, Meshy realistic, free Asset Store packs the developer imports), every Kenney asset removed, full post-processing.
-3. **Economy** - minerals, bag, money, the shop and its upgrades replace scrap and the workbench.
-4. **The cat shopkeeper** - Meshy, rigged quadruped, idle animations; show the cat before anything else is generated. Then stop.
-5. **Sound** - CC0 / royalty-free recorded foley, sources and licences in CREDITS.md.
-6. **Dream hints** in the world and the cat's lines, and **two ending options** for the developer to choose from (not implemented until chosen).
-
-Performance budget: 60 fps at 1080p on the developer's laptop. Check frame time in Play mode after each visual change and report anything heavy. Repo size: 2K textures, never 4K or 8K.
+Performance budget: 60 fps at 1080p on the developer's laptop. A built player run with `-benchmark <file>` visits the yard, each stratum, the shop and the ending and writes the frame rate at each. Repo size: 2K textures, never 4K or 8K.
 
 ## Conventions
 
@@ -86,61 +75,36 @@ Claude drives the open Editor with the Unity CLI (`unity command ...`, Pipeline 
 
 ## Meshy (generated 3D assets)
 
-- Use Meshy for all hero assets: the nine memory objects, the shovels and key props.
+- **Budget: 245 credits left, and no more budget.** Before any generation, say what it is for and its cost. Never regenerate or refine for small improvements. The only allowed use was the nine memory objects (already done); everything else (minerals, spades, props, house, fence, furniture) comes from Poly Haven or the Unity demo pack, with material and scale variants.
+- Models already generated and kept: the house, fence, spade, bookshelf, shop counter, cat (sitting and sleeping), bed, eleven minerals and nine memory objects.
 - Style: **realistic PBR** (base colour, normal, roughness, metallic), worn and lived-in, warm and nostalgic. Not low poly, not stylized. 2K textures.
-- Generate one asset first and show the developer a screenshot of it in the scene before generating the rest. Report credits used after each batch.
+- Report credits used after each batch.
 - Save Meshy assets under `Assets/ThirdParty/Meshy/<AssetName>/`. They are generated on a paid plan with full commercial rights.
 
 ## Project layout
 
 - `Assets/Scripts/`: runtime code.
-  - `DigGame.cs` (on "Game"): rules and state (scrap, shovel level, memory finds, digging rules, workbench interaction). Tuning values are serialized fields.
-  - `DigVolume.cs` (on "Dig Site/Volume"): the diggable ground. A density field (0.25 m voxels, 48 x 40 x 48 m, 4 m chunks) meshed with marching cubes in Burst jobs; one MeshCollider per chunk. `Carve()` removes a noisy, rounded scoop; strata harder than the current shovel are left alone, and the outer shell and the ground under the house, fence and bench cannot be dug. The starting surface is read from the Unity Terrain's heightmap.
+  - `DigGame.cs` (on "Game"): rules and state (coins, bag, spade level, upgrades, what a stroke does, memory and fragment finds, demo jumps, R to the surface and back). Tuning values are serialized fields.
+  - `DigVolume.cs` (on "Dig Site/Volume"): the diggable ground. A density field (0.25 m voxels, 48 x 40 x 48 m, 4 m chunks) meshed with marching cubes in Burst jobs; one MeshCollider per chunk. `Carve()` removes a ragged scoop; `CollapseLoose()` drops earth that lost its hold; `Deposit()` builds heaps. Strata harder than the spade and protected ground (the outer shell, the surface outside the bare patch) stay.
   - `MarchTables.cs`: the marching cubes triangle table (Paul Bourke's public table).
-  - `DigPath.cs` (on "Dig Site/Life Path"): the hidden life path. Control points (editable in the scene), sampled to a polyline; gives positions by distance and the distance from any point to the path (softness, warmth).
-  - `DigPlayer.cs` (Player prefab): movement with acceleration, slope projection, slow scrambling up steep slopes, sliding only on near-vertical ones, look, dig input and rhythm, camera smoothing, kick and bob.
-  - `DigShovel.cs` (Player prefab, under the camera): one model per shovel level; plays the swing clips through an Animator and relays their Impact and Toss events; hit-stop; idle sway and walk bob.
-  - `DigScoop.cs` (on "Dig Site/Scoops"): runs each scoop as a short tween (the hole grows, then its rim crumbles).
-  - `DigDebris.cs` (on "Dig Site/Debris"): pooled physical clods (Rigidbodies, capped) plus crumb and dust particle systems.
-  - `DigAim.cs` (on "Dig Site/Aim Ring"): the subtle ring that shows where the next scoop will land.
-  - `DigHud.cs` (HUD prefab): updates the Canvas UI. Controls hint fades out after a few seconds.
-  - `DigAtmosphere.cs` (on "Game"): dimmer, warmer ambient light and fog with depth; drives the lantern light on the player.
-  - `MemoryData.cs`: ScriptableObject per memory (title, line, path distance, stratum, card sprite, optional own find prefab). Assets in `Assets/Data/Memories/`.
-  - `MemoryFind.cs` (Memory Find prefabs and the Blank Page prefab): a found object lying in the dirt.
-  - `MemoryShelf.cs` (Memory Shelf prefab): nine framed card slots, rows top to bottom = Childhood, School Days, Growing Up.
-  - `DigStory.cs` (on "Game"): memory card, letter after a stratum's third memory, the ending sequence. Locks player input while open.
-  - `LetterData.cs`: ScriptableObject per letter (title, lines). Assets in `Assets/Data/Letters/`; the ending is letter 4. The blank page is `Assets/Data/Blank Page.asset`.
-  - `DigDemo.cs` (on "Game"): demo mode.
-  - `Workbench.cs` (Workbench prefab): upgrade spot. Walk up and press E.
-- `Assets/Shaders/DigSoil.shader`: the ground shader (URP, hand-written HLSL): matte, world-space, grass on the untouched surface, strata by depth, warmer near the life path.
-- `Assets/Animations/`: shovel swing clips and their Animator Controller (made by the setup script, editable in the Animation window).
-- `Assets/Editor/DigInSceneBuilder.cs`: the setup script (assets, prefabs, lighting, dig site, hub, wiring).
-- `Assets/Editor/DigInSceneBuilder.Environment.cs`: the world around the yard: Unity Terrain (heightmap from `GroundHeight`, pines), house, yard.
-- `Assets/Editor/DigInSceneBuilder.Feel.cs`: swing clips, Animator Controller, debris meshes, particle systems, aim ring.
-- `Assets/Editor/DigInSceneBuilder.Meshy.cs`: turns a Meshy asset into a material, a find prefab and a card illustration.
-- `Assets/Materials`, `Assets/Textures`, `Assets/Meshes`, `Assets/Prefabs`, `Assets/Data`, `Assets/Fonts`, `Assets/Animations`: content made by the setup script, then edited by hand.
-- `Assets/ThirdParty/`: imported art packs (see Art below). Do not edit files there; make prefab variants instead.
-
-Notes:
-
-- The dig volume covers x, z -22..26 and y -36..4; the Unity Terrain has a hole over that square and only shows beyond it. The volume's top surface comes from the same heightmap, so the two meet.
-- Stratum boundaries are at 10.5 m and 21.5 m below the surface, wobbling by about a metre.
-- Major memories lie at fixed distances along the path. One turns up when the player digs within reach of its spot. The ending does not depend on having found all of them: it fills the shelf.
-- R returns to the surface; pressed again near the spawn point, it takes you back down to where you left.
-- Debris clods live on the built-in "Ignore Raycast" layer, so aiming and pick-up rays pass through them; the player's controller ignores them, so piles never jitter the camera.
-- Objects named "(placeholder)" are primitives standing in for imported art. Replace them, do not polish them.
-
-## Art
-
-- Realistic, warm, nostalgic. CC0 sources (Poly Haven, ambientCG), free Asset Store packs the developer imports, and Meshy for hero assets. List every source in the Devpost credits.
-- **Kenney is on its way out**: the packs under `Assets/ThirdParty/Kenney` still dress the yard until step 5 replaces them. Do not add new Kenney content.
-- Imported so far: `Assets/ThirdParty/Kenney/{NatureKit,SurvivalKit,FurnitureKit,FantasyTownKit}` (FBX only, to be removed), `Assets/ThirdParty/PolyHaven/evening_field_2k.hdr`, `Assets/Fonts/Lora-{Regular,Italic}.ttf`.
-- World layout (metres): yard x -12..17, z -16..10, fenced; house back wall along z = -16 with the door at x = 4 and the shelf at x = 0.8; workbench under a lean-to at (12.3, -7); spawn (3, -8) facing north; the dig starts in a hollow at (2.5, 2.5). Terrain is 256 m square from (-126, -126), 0.5 m cells, with a hole over the dig volume. Pine-covered hills ring everything.
-- Look: golden hour, soft haze, a small family backyard. Underground: gentle darkness with a warm lantern glow; tunnels should feel cozy, not scary.
+  - `DigPath.cs` (on "Dig Site/Life Path"): the hidden life path (control points in the scene).
+  - `DigScoop.cs`, `DigDebris.cs` (+ `DigClodBody.cs`), `DigAim.cs`: the scoop tween, the clods/crumbs/dust and heaps, the aim ring.
+  - `DigGrass.cs` (on "Dig Site/Grass"): instanced grass clumps on the diggable yard, removed where the ground is dug or covered.
+  - `DigMinerals.cs` + `MineralData.cs`: mineral spots, showing, popping out, picking up. Data in `Assets/Data/Minerals/`.
+  - `DigShop.cs` (on "Game"): the cat's price board, prices, the cat's lines (including the ones a cat couldn't know).
+  - `DigCat.cs`: the cat's breathing and purring (Animator, `Assets/Animations/Cat.controller`), turning to watch you.
+  - `DigAudio.cs` (on "Game"): all sound; clips in `Assets/Audio/`.
+  - `DigPlayer.cs`, `DigShovel.cs`: movement, look, dig input; the animated spade (clips in `Assets/Animations/`).
+  - `DigHud.cs`, `DigStory.cs`: HUD, cards, letters, the ending and the waking scene.
+  - `DigAtmosphere.cs`: darker, warmer light and fog with depth; the lantern.
+  - `MemoryData.cs` (memories and fragments), `MemoryFind.cs`, `MemoryShelf.cs`, `LetterData.cs`, `Workbench.cs` (the shop counter's interact spot), `DigDemo.cs` (demo mode and `-benchmark`).
+- `Assets/Shaders/`: `DigSoil.shader` (the ground: photoscanned triplanar soil/clay/stone/grass, matte), `DigClod.shader` (loose earth), `DigTriplanar.hlsl`.
+- `Assets/Editor/DigInSceneBuilder*.cs`: the setup script, split by topic: main (assets, prefabs, dig site, hub, wiring), Environment (terrain, house, yard, trees), Realistic (sky, post, model import), Soil, Feel (swing clips, clods, particles), Economy (minerals, shop UI), Cat, Bedroom (the ending), Fragments, Meshy (memory finds and card art), Audio.
+- `Assets/ThirdParty/`: `PolyHaven/` (textures, `Models/`), `UnityTerrainDemo/` (only what is used), `Meshy/`. Do not edit files there.
 
 ## Demo mode
 
-F12 toggles demo mode (badge at top right). Then F1 = surface with the Toy Shovel, F2 = start of School Days with the Garden Shovel, F3 = start of Growing Up with the Steel Shovel, F4 = the end of the path with the blank page in front of you. A jump digs a tunnel along the life path up to that point and skips the memories before it. Target demo flow: 30 seconds of digging -> first object -> F4 -> ending.
+F12 toggles demo mode (badge at top right). Then F1 = surface with the Old Spade, F2 = start of School Days with the Garden Spade, F3 = start of Growing Up with the Steel Spade, F4 = the end of the path with the blank page in front of you, F5 = the cat's shop with a bag of stones. A jump digs a tunnel along the life path up to that point and skips the memories before it. The judging script is `DEMO.md`.
 
 ## Memory objects
 

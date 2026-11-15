@@ -38,9 +38,9 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v9 four spades";
+    const string PlayerVersion = "v10 softer lantern";
     const string FindVersion = "v5 polyhaven";
-    const string ShelfVersion = "v4 meshy shelf";
+    const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
     const string HudVersion = "v8 demo shop";
     const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
@@ -445,7 +445,7 @@ public static partial class DigInSceneBuilder
         lanternGo.transform.localPosition = new Vector3(-0.35f, 0f, 0.1f);
         var lantern = lanternGo.AddComponent<Light>();
         lantern.type = LightType.Point;
-        lantern.color = new Color(1f, 0.72f, 0.42f);
+        lantern.color = new Color(1f, 0.83f, 0.64f);
         lantern.range = 8f;
         lantern.intensity = 0f;
         lantern.shadows = LightShadows.None;
@@ -605,7 +605,7 @@ public static partial class DigInSceneBuilder
             int row = i / 3, column = i % 3;
             var slot = new GameObject("Slot " + (i + 1)).transform;
             slot.SetParent(slotsRoot, false);
-            slot.localPosition = new Vector3(b.center.x + (column - 1) * b.size.x * 0.29f, b.min.y + b.size.y * rowTop[row] + 0.005f, b.center.z);
+            slot.localPosition = new Vector3(b.center.x + (1 - column) * b.size.x * 0.29f, b.min.y + b.size.y * rowTop[row] + 0.005f, b.center.z);
             shelf.slots[i] = BuildShelfCard(slot, m, font);
         }
         return SavePrefab(root, path);
