@@ -40,11 +40,17 @@ public static partial class DigInSceneBuilder
         var st = Ink("Title", settings, font, 28f, TextAlignmentOptions.Center, "Settings", top, new Vector2(0f, -70f), new Vector2(500f, 40f), 0.6f);
         st.characterSpacing = 8f;
         st.fontStyle = FontStyles.SmallCaps;
-        Ink("Volume Label", settings, italic, 30f, TextAlignmentOptions.Left, "Volume", top, new Vector2(0f, -190f), new Vector2(460f, 40f), 0.85f);
-        hud.pauseVolume = NotebookSlider("Volume", settings, new Vector2(0f, -244f));
-        Ink("Sensitivity Label", settings, italic, 30f, TextAlignmentOptions.Left, "Mouse sensitivity", top, new Vector2(0f, -330f), new Vector2(460f, 40f), 0.85f);
-        hud.pauseSensitivity = NotebookSlider("Sensitivity", settings, new Vector2(0f, -384f));
-        hud.pauseSettingsBack = WordButton("Back", settings, new Vector2(0f, -520f), font, "Back");
+        Ink("Volume Label", settings, italic, 30f, TextAlignmentOptions.Left, "Volume", top, new Vector2(0f, -136f), new Vector2(460f, 40f), 0.85f);
+        hud.pauseVolume = NotebookSlider("Volume", settings, new Vector2(0f, -180f));
+        hud.pauseMusicOn = NotebookCheck("Music On", settings, new Vector2(-230f, -238f));
+        Ink("Music Label", settings, italic, 30f, TextAlignmentOptions.Left, "Music", top, new Vector2(24f, -236f), new Vector2(412f, 40f), 0.85f);
+        hud.pauseMusic = NotebookSlider("Music", settings, new Vector2(0f, -282f));
+        hud.pauseEffectsOn = NotebookCheck("Effects On", settings, new Vector2(-230f, -340f));
+        Ink("Effects Label", settings, italic, 30f, TextAlignmentOptions.Left, "Sound effects", top, new Vector2(24f, -338f), new Vector2(412f, 40f), 0.85f);
+        hud.pauseEffects = NotebookSlider("Effects", settings, new Vector2(0f, -384f));
+        Ink("Sensitivity Label", settings, italic, 30f, TextAlignmentOptions.Left, "Mouse sensitivity", top, new Vector2(0f, -442f), new Vector2(460f, 40f), 0.85f);
+        hud.pauseSensitivity = NotebookSlider("Sensitivity", settings, new Vector2(0f, -486f));
+        hud.pauseSettingsBack = WordButton("Back", settings, new Vector2(0f, -580f), font, "Back");
         settings.gameObject.SetActive(false);
 
         // Quit: asks once.
@@ -176,6 +182,41 @@ public static partial class DigInSceneBuilder
         nav.mode = Navigation.Mode.None;
         slider.navigation = nav;
         return slider;
+    }
+
+    // A little inked box with a dot in it when on, 34 px; `pos` is its top left, from the top centre.
+    static Toggle NotebookCheck(string name, Transform parent, Vector2 pos)
+    {
+        var top = new Vector2(0.5f, 1f);
+        var node = UiNode(name, parent, top, top, pos, new Vector2(34f, 34f));
+        node.pivot = new Vector2(0f, 1f);
+        node.anchoredPosition = pos;
+        var box = node.gameObject.AddComponent<Image>();
+        box.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        box.type = Image.Type.Sliced;
+        box.color = Color.white;
+        var edge = node.gameObject.AddComponent<Outline>();
+        edge.effectColor = new Color(InkColor.r, InkColor.g, InkColor.b, 0.7f);
+        edge.effectDistance = new Vector2(1.5f, -1.5f);
+        var mark = Stretch("Mark", node, Vector2.zero, Vector2.one, new Vector2(8f, 8f), new Vector2(-8f, -8f));
+        var dot = mark.gameObject.AddComponent<Image>();
+        dot.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        dot.color = new Color(0.55f, 0.36f, 0.20f);
+        dot.raycastTarget = false;
+        var toggle = node.gameObject.AddComponent<Toggle>();
+        toggle.targetGraphic = box;
+        toggle.graphic = dot;
+        toggle.isOn = true;
+        var colors = toggle.colors;
+        colors.normalColor = new Color(0.99f, 0.96f, 0.9f);
+        colors.highlightedColor = new Color(1f, 0.88f, 0.72f);
+        colors.pressedColor = new Color(0.9f, 0.78f, 0.62f);
+        colors.selectedColor = colors.normalColor;
+        toggle.colors = colors;
+        var nav = toggle.navigation;
+        nav.mode = Navigation.Mode.None;
+        toggle.navigation = nav;
+        return toggle;
     }
 
     static RectTransform Stretch(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)

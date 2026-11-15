@@ -16,7 +16,15 @@ public static partial class DigInSceneBuilder
     static AudioMixer BuildMixer()
     {
         var existing = AssetDatabase.LoadAssetAtPath<AudioMixer>(MixerPath);
-        if (existing != null) { Skipped(MixerPath); return existing; }
+        if (existing != null)
+        {
+            // The pause menu's Music and Sound Effects settings (Ambience follows Sound Effects).
+            ExposeVolume(existing, "Music", "MusicVolume");
+            ExposeVolume(existing, "SFX", "SfxVolume");
+            ExposeVolume(existing, "Ambience", "AmbienceVolume");
+            Skipped(MixerPath);
+            return existing;
+        }
 
         const BindingFlags Any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
         var asm = typeof(Editor).Assembly;
@@ -52,6 +60,35 @@ public static partial class DigInSceneBuilder
         AssetDatabase.SaveAssets();
         Created(MixerPath);
         return AssetDatabase.LoadAssetAtPath<AudioMixer>(MixerPath);
+    }
+
+    // Exposes a group's volume under `param` (once).
+    static void ExposeVolume(AudioMixer mixerAsset, string groupName, string param)
+    {
+        if (mixerAsset.GetFloat(param, out _)) return;
+        const BindingFlags Any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+        var asm = typeof(Editor).Assembly;
+        var controllerType = asm.GetType("UnityEditor.Audio.AudioMixerController");
+        var groupType = asm.GetType("UnityEditor.Audio.AudioMixerGroupController");
+        var group = MixerGroup(mixerAsset, groupName);
+        if (group == null) return;
+        var guid = (GUID)groupType.GetMethod("GetGUIDForVolume", Any).Invoke(group, null);
+        var pathType = asm.GetType("UnityEditor.Audio.AudioGroupParameterPath");
+        var path = System.Activator.CreateInstance(pathType, group, guid);
+        controllerType.GetMethod("AddExposedParameter", Any).Invoke(mixerAsset, new[] { path });
+        var exposedProp = controllerType.GetProperty("exposedParameters", Any);
+        var exposed = (System.Array)exposedProp.GetValue(mixerAsset);
+        for (int i = 0; i < exposed.Length; i++)
+        {
+            var p = exposed.GetValue(i);
+            if ((GUID)p.GetType().GetField("guid", Any).GetValue(p) != guid) continue;
+            p.GetType().GetField("name", Any).SetValue(p, param);
+            exposed.SetValue(p, i);
+        }
+        exposedProp.SetValue(mixerAsset, exposed);
+        EditorUtility.SetDirty(mixerAsset);
+        AssetDatabase.SaveAssets();
+        report.AppendLine("  exposed " + param);
     }
 
     static AudioMixerGroup MixerGroup(AudioMixer mixer, string name) =>

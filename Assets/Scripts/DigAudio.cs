@@ -244,6 +244,20 @@ public class DigAudio : MonoBehaviour
         else AudioListener.volume = v;
     }
 
+    // The pause menu's Music and Sound Effects settings (ambience follows sound effects).
+    public void SetMusic(bool on, float v) => SetParam("MusicVolume", on ? v : 0f);
+
+    public void SetEffects(bool on, float v)
+    {
+        SetParam("SfxVolume", on ? v : 0f);
+        SetParam("AmbienceVolume", on ? v : 0f);
+    }
+
+    void SetParam(string param, float v)
+    {
+        if (mixer != null) mixer.SetFloat(param, v <= 0.0001f ? -80f : 20f * Mathf.Log10(v));
+    }
+
     // ---- Every frame ----------------------------------------------------------------
     void Update()
     {

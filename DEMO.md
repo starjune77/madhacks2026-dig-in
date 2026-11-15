@@ -16,7 +16,7 @@ Before the judge arrives: launch the game (`Builds/Windows/DigIn.exe`) or press 
 
 If time is short, skip from 0:45 straight to F4.
 
-Other keys: **F1** back to the surface at the start, **R** up to the surface (and back down to where you were). **Esc** closes the shop, a card or a letter; otherwise it opens the pause menu (a notebook page over the blurred yard: Resume, How to Play, Settings for volume and mouse sensitivity, Quit Game). In the shop the number keys still work: **1** sell everything, **2** spade, **3** bag, **4** lantern.
+Other keys: **F1** back to the surface at the start, **R** up to the surface (and back down to where you were). **Esc** closes the shop, a card or a letter; otherwise it opens the pause menu (a notebook page over the blurred yard: Resume, How to Play, Settings for volume, music and sound effects (each with an on/off box and a slider, saved between launches) and mouse sensitivity, Quit Game). In the shop the number keys still work: **1** sell everything, **2** spade, **3** bag, **4** lantern.
 
 The first time you walk past the shop before digging, the cat watches the bare patch: "Something's under the soft ground, I think."
 

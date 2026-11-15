@@ -105,6 +105,10 @@ public class DigHud : MonoBehaviour
     public Button pauseQuit;
     public Slider pauseVolume;
     public Slider pauseSensitivity;
+    public Toggle pauseMusicOn;
+    public Slider pauseMusic;
+    public Toggle pauseEffectsOn;
+    public Slider pauseEffects;
     public Button pauseSettingsBack;
     public Button pauseQuitYes;
     public Button pauseQuitNo;

@@ -42,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v15 pause";
+    const string HudVersion = "v16 audio settings";
     const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment

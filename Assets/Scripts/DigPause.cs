@@ -24,6 +24,8 @@ public class DigPause : MonoBehaviour
     const string SeenKey = "DigIn.HowToSeen";
     const string VolumeKey = "DigIn.Volume";
     const string SensitivityKey = "DigIn.Sensitivity";
+    const string MusicKey = "DigIn.Music", MusicOnKey = "DigIn.MusicOn";
+    const string EffectsKey = "DigIn.Effects", EffectsOnKey = "DigIn.EffectsOn";
 
     enum Page { None, Menu, Settings, Confirm, HowTo, Intro }
     Page page = Page.None;
@@ -58,6 +60,17 @@ public class DigPause : MonoBehaviour
             if (game.player != null) game.player.lookSensitivity = s;
             Set(SensitivityKey, s);
         });
+
+        // Music and sound effects: on/off and a volume each, through the mixer.
+        hud.pauseMusicOn.SetIsOnWithoutNotify(Get(MusicOnKey, 1f) > 0.5f);
+        hud.pauseMusic.SetValueWithoutNotify(Get(MusicKey, 1f));
+        hud.pauseEffectsOn.SetIsOnWithoutNotify(Get(EffectsOnKey, 1f) > 0.5f);
+        hud.pauseEffects.SetValueWithoutNotify(Get(EffectsKey, 1f));
+        ApplyChannels();
+        hud.pauseMusicOn.onValueChanged.AddListener(on => { Set(MusicOnKey, on ? 1f : 0f); ApplyChannels(); });
+        hud.pauseMusic.onValueChanged.AddListener(v => { Set(MusicKey, v); ApplyChannels(); });
+        hud.pauseEffectsOn.onValueChanged.AddListener(on => { Set(EffectsOnKey, on ? 1f : 0f); ApplyChannels(); });
+        hud.pauseEffects.onValueChanged.AddListener(v => { Set(EffectsKey, v); ApplyChannels(); });
 
         // The first time ever: the note, before anything moves. Never in a benchmark run.
         bool benchmark = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-benchmark") >= 0;
@@ -139,6 +152,16 @@ public class DigPause : MonoBehaviour
     public void OpenMenu()
     {
         if (!IsOpen) Open(Page.Menu);
+    }
+
+    void ApplyChannels()
+    {
+        if (DigAudio.I == null) return;
+        DigAudio.I.SetMusic(hud.pauseMusicOn.isOn, hud.pauseMusic.value);
+        DigAudio.I.SetEffects(hud.pauseEffectsOn.isOn, hud.pauseEffects.value);
+        // A switched-off channel's slider fades a little, so it reads as off.
+        hud.pauseMusic.interactable = hud.pauseMusicOn.isOn;
+        hud.pauseEffects.interactable = hud.pauseEffectsOn.isOn;
     }
 
     // Through the mixer's master volume (DigAudio), or the listener if there is none.
