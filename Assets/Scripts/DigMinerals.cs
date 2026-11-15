@@ -4,10 +4,10 @@ using UnityEngine;
 // Minerals in the ground. Their spots are fixed (a seed), mostly near the life path, and
 // which kind lies where depends on the stratum. Near the player each one is shown where
 // it lies, inside the earth: only the part a wall cuts through shows, with a faint glint,
-// so they can be spotted. A scoop that reaches one pops it out and it comes to rest on the
-// ground, glinting. Aim at it within reach and it lights up softly; E picks it up (it lifts
-// toward you and is gone into the bag). Sits on "Dig Site/Minerals"; the kinds and the
-// glint prefab are assets.
+// so they can be spotted. A scoop that reaches one brings it out: it lies on the floor of
+// that scoop, a little sunk in, glinting faintly (one per scoop at most, never thrown, never
+// floating). Aim at it within reach and it brightens; E picks it up (it lifts toward you and
+// is gone into the bag). Sits on "Dig Site/Minerals"; the kinds and the glint prefab are assets.
 public class DigMinerals : MonoBehaviour
 {
     public DigVolume volume;
@@ -25,48 +25,45 @@ public class DigMinerals : MonoBehaviour
     [Tooltip("Extra spots anywhere in the volume, for those who wander.")]
     public int strays = 60;
 
-    [Header("A generous start, and never too long without a find")]
-    [Tooltip("Extra spots per metre along the first stretch of the path (common, shallow).")]
-    public float earlyPerMetre = 4f;
-    public float earlyLength = 14f;
-    [Tooltip("Scoops before the very first find is guaranteed.")]
-    public int firstFindScoops = 7;
-    [Tooltip("Scoops in a row without a find before the next one brings one, per stratum (deeper is rarer).")]
-    public int[] pityScoops = { 4, 6, 7 };
-    int dryScoops;
-    bool foundAny;
-
     [Header("Showing and picking up")]
     [Tooltip("Every specimen is this many times its kind's size, so it reads from 2-3 m away.")]
     public float sizeScale = 2f;
-    [Tooltip("Glint: bigger and more frequent sparkles than the prefab's.")]
-    public float glintSize = 1.8f;
-    public float glintRate = 1.6f;
     public float showDistance = 5f;
-    public float pickupDistance = 1.3f;
     [Tooltip("A scoop frees a mineral within its radius plus this much.")]
     public float freeMargin = 0.2f;
+    [Tooltip("At most this many minerals lie loose in the world; the oldest go quietly.")]
+    public int maxLoose = 8;
+
+    [Header("How often (one per scoop at most)")]
+    [Tooltip("The very first find is guaranteed by this scoop.")]
+    public int firstFindBy = 6;
+    [Tooltip("Scoops after a find before the next natural find can come, per stratum.")]
+    public int[] minScoopsBetween = { 3, 4, 5 };
+    [Tooltip("Scoops in a row without a find before the next scoop brings one, per stratum.")]
+    public int[] pityAfter = { 5, 6, 7 };
 
     public class Spot
     {
         public Vector3 position;
         public Quaternion rotation;
         public MineralData kind;
-        public GameObject shown;     // the specimen in the wall, while near
-        public Rigidbody loose;      // after it popped out
-        public Vector3 poppedAt;     // where it came out (open air), to catch it if it slips through
-        public float poppedTime;
+        public GameObject shown;     // the specimen in the wall while near, or lying in the hole
+        public bool isLoose;         // dug out, lying where it fell, waiting to be picked up
         public bool taken;
     }
 
     readonly List<Spot> spots = new List<Spot>();
     readonly List<Spot> loose = new List<Spot>();
-    float checkTimer;
+    float checkTimer, looseTimer;
+    int sinceFind;
+    bool foundAny;
 
-    // Picking up: the one under the crosshair, a soft light on it, and the ones lifting away.
-    Spot aimed;
-    Light highlight;
+    // Picking up: the one under the crosshair (a little brighter) and the ones lifting away.
+    Spot aimed, lit;
+    MaterialPropertyBlock glow;
     readonly List<(Transform t, Vector3 from, float time)> lifting = new List<(Transform, Vector3, float)>();
+
+    public int Count => spots.Count;
 
     // The loose mineral the player is aiming at within reach (null if none).
     public MineralData Aim(Ray ray, float reach)
@@ -86,11 +83,10 @@ public class DigMinerals : MonoBehaviour
             best = off / allowed + along * 0.01f;
             aimed = s;
         }
-        UpdateHighlight();
         return aimed?.kind;
     }
 
-    // Picks up the aimed mineral: it lifts toward `to` and fades into the bag.
+    // Picks up the aimed mineral: it lifts toward the camera and is gone into the bag.
     public MineralData PickUp(Vector3 to)
     {
         var s = aimed;
@@ -98,60 +94,24 @@ public class DigMinerals : MonoBehaviour
         s.taken = true;
         loose.Remove(s);
         aimed = null;
-        UpdateHighlight();
-        var go = s.shown;
-        if (s.loose != null) Destroy(s.loose);
-        foreach (var c in go.GetComponentsInChildren<Collider>()) Destroy(c);
-        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>()) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        lifting.Add((go.transform, go.transform.position, 0f));
-        liftTarget = to;
+        Light(null);
+        foreach (var ps in s.shown.GetComponentsInChildren<ParticleSystem>()) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        lifting.Add((s.shown.transform, s.shown.transform.position, 0f));
         return s.kind;
     }
-    Vector3 liftTarget;
-    float looseTimer;
-
-    void UpdateHighlight()
-    {
-        if (highlight == null)
-        {
-            highlight = new GameObject("Mineral Highlight").AddComponent<Light>();
-            highlight.transform.SetParent(transform, false);
-            highlight.type = LightType.Point;
-            highlight.color = new Color(1f, 0.9f, 0.72f);
-            highlight.range = 0.9f;
-            highlight.intensity = 0f;
-            highlight.shadows = LightShadows.None;
-        }
-        highlight.enabled = aimed != null && aimed.shown != null;
-        if (highlight.enabled) highlight.transform.position = Bounds(aimed.shown).center + Vector3.up * 0.3f;
-    }
-
-    public int Count => spots.Count;
 
     void Start()
     {
         var rng = new System.Random(seed);
         float R() => (float)rng.NextDouble();
-
         int n = Mathf.RoundToInt(path.Length * perMetre);
         for (int i = 0; i < n; i++)
         {
             float d = Mathf.Lerp(3f, path.Length - 1f, R());
-            Vector3 p = path.PointAt(d) + Random3(rng) * spread * Mathf.Sqrt(R());
-            Add(p, rng);
-        }
-        int early = Mathf.RoundToInt(earlyLength * earlyPerMetre);
-        for (int i = 0; i < early; i++)
-        {
-            float d = Mathf.Lerp(0.5f, earlyLength, R());
-            Vector3 p = path.PointAt(d) + Random3(rng) * spread * 0.8f * Mathf.Sqrt(R());
-            Add(p, rng);
+            Add(path.PointAt(d) + Random3(rng) * spread * Mathf.Sqrt(R()), rng);
         }
         for (int i = 0; i < strays; i++)
-        {
-            var p = DigVolume.Min + new Vector3(R() * DigVolume.Size.x, R() * (DigVolume.Size.y - 6f), R() * DigVolume.Size.z);
-            Add(p, rng);
-        }
+            Add(DigVolume.Min + new Vector3(R() * DigVolume.Size.x, R() * (DigVolume.Size.y - 6f), R() * DigVolume.Size.z), rng);
     }
 
     static Vector3 Random3(System.Random rng)
@@ -165,89 +125,108 @@ public class DigMinerals : MonoBehaviour
     void Add(Vector3 p, System.Random rng)
     {
         if (p.y > -0.9f || !volume.Contains(p) || volume.IsProtected(p) || !volume.Solid(p)) return;
-        int stratum = volume.StratumAt(p);
+        var kind = PickKind(volume.StratumAt(p), (float)rng.NextDouble());
+        if (kind != null) spots.Add(new Spot { position = p, kind = kind, rotation = Quaternion.Euler((float)rng.NextDouble() * 360f, (float)rng.NextDouble() * 360f, 0f) });
+    }
+
+    MineralData PickKind(int stratum, float roll)
+    {
         float total = 0f;
         foreach (var k in kinds) total += Mathf.Max(0f, k.weightByStratum[stratum]);
-        if (total <= 0f) return;
-        float pick = (float)rng.NextDouble() * total;
-        MineralData kind = kinds[0];
+        if (total <= 0f) return null;
+        float pick = roll * total;
         foreach (var k in kinds)
         {
             pick -= Mathf.Max(0f, k.weightByStratum[stratum]);
-            if (pick <= 0f) { kind = k; break; }
+            if (pick <= 0f) return k;
         }
-        spots.Add(new Spot { position = p, kind = kind, rotation = Quaternion.Euler((float)rng.NextDouble() * 360f, (float)rng.NextDouble() * 360f, 0f) });
+        return kinds[kinds.Length - 1];
     }
 
-    // Called when a scoop has opened (DigGame): minerals it reached pop out. After a few
-    // scoops in a row with nothing, this one brings one anyway (sooner for the very first).
+    // Called when a scoop has opened (DigGame). At most one mineral comes out, and it lies
+    // on the floor of this scoop: the nearest one the scoop reached (if it has been long
+    // enough since the last find), or, after a few empty scoops, one anyway. Others the
+    // scoop laid bare go quietly, so nothing hangs in the air.
     public void Freed(Vector3 center, float radius, Vector3 toward)
     {
+        sinceFind++;
+        int stratum = Mathf.Clamp(volume.StratumAt(center), 0, pityAfter.Length - 1);
         float r = radius + freeMargin;
-        int freed = 0;
+        Spot nearest = null;
+        float bestD = float.MaxValue;
         foreach (var s in spots)
         {
-            if (s.taken || s.loose != null) continue;
-            if ((s.position - center).sqrMagnitude > r * r) continue;
-            if (volume.Solid(s.position) && (s.position - center).sqrMagnitude > radius * radius * 0.7f) continue;   // still held by earth
-            PopOut(s, toward);
-            freed++;
+            if (s.taken || s.isLoose) continue;
+            float d = (s.position - center).sqrMagnitude;
+            if (d > r * r) continue;
+            if (volume.Solid(s.position) && d > radius * radius * 0.7f) continue;   // still held by earth
+            if (d < bestD) { bestD = d; nearest = s; }
         }
-        if (freed > 0) { dryScoops = 0; foundAny = true; return; }
-        dryScoops++;
-        int stratum = Mathf.Clamp(volume.StratumAt(center), 0, pityScoops.Length - 1);
-        if (dryScoops < (foundAny ? pityScoops[stratum] : firstFindScoops)) return;
-        dryScoops = 0;
-        foundAny = true;
-        // In the open air of the fresh scoop, a little toward the player (never inside the earth).
-        Vector3 at = center + toward.normalized * radius * 0.25f;
-        if (volume.Solid(at)) at = center;
-        Grant(at, toward, volume.StratumAt(center));
-    }
-
-    // A mineral of this stratum's kinds, out of the scoop just made.
-    void Grant(Vector3 at, Vector3 toward, int stratum)
-    {
-        float total = 0f;
-        foreach (var k in kinds) total += Mathf.Max(0f, k.weightByStratum[stratum]);
-        if (total <= 0f) return;
-        float pick = Random.value * total;
-        MineralData kind = kinds[0];
-        foreach (var k in kinds)
+        bool natural = nearest != null && sinceFind > minScoopsBetween[stratum];
+        bool pity = sinceFind >= (foundAny ? pityAfter[stratum] : firstFindBy);
+        foreach (var s in spots)
         {
-            pick -= Mathf.Max(0f, k.weightByStratum[stratum]);
-            if (pick <= 0f) { kind = k; break; }
+            if (s.taken || s.isLoose || (natural && s == nearest)) continue;
+            if ((s.position - center).sqrMagnitude > r * r || volume.Solid(s.position)) continue;
+            Vanish(s);   // laid bare but not this time's find: never left floating
         }
-        var s = new Spot { position = at, kind = kind, rotation = Random.rotation };
-        spots.Add(s);
-        PopOut(s, toward);
+        if (!natural && !pity) return;
+        Spot found = natural ? nearest : new Spot { kind = PickKind(volume.StratumAt(center), Random.value), rotation = Random.rotation };
+        if (found.kind == null) return;
+        if (!natural) spots.Add(found);
+        Lay(found, center + Random.insideUnitSphere * radius * 0.25f);
+        sinceFind = 0;
+        foundAny = true;
     }
 
-    void PopOut(Spot s, Vector3 toward)
+    void Vanish(Spot s)
     {
+        s.taken = true;
+        if (s.shown != null) Destroy(s.shown);
+        s.shown = null;
+    }
+
+    // Puts a mineral on the open ground under `at` (the scoop's floor), slightly sunk in.
+    void Lay(Spot s, Vector3 at)
+    {
+        s.position = at;
         if (s.shown == null) Show(s);
-        // Out into the open: a stone still inside the earth would sink through it.
-        Vector3 c = Bounds(s.shown).center, p = c, dir = toward.sqrMagnitude > 0.0001f ? toward.normalized : Vector3.up;
-        for (int k = 0; k < 24 && volume.Solid(p); k++) p += dir * 0.1f;
-        s.shown.transform.position += p - c;
-        var body = s.shown.AddComponent<Rigidbody>();
-        body.mass = 0.3f;
-        body.linearDamping = 0.2f;
-        body.angularDamping = 1.5f;
-        // Sized in world metres: the model's own units can be anything (a 0.5-unit sphere
-        // on a Meshy model was 3 m across and choked the physics).
-        var col = s.shown.AddComponent<SphereCollider>();
-        col.radius = s.kind.size * sizeScale * 0.4f / Mathf.Max(0.0001f, s.shown.transform.lossyScale.x);
-        col.center = s.shown.transform.InverseTransformPoint(Bounds(s.shown).center);
-        int layer = LayerMask.NameToLayer("Debris");
-        if (layer >= 0) s.shown.layer = layer;
-        body.linearVelocity = (toward.normalized * 0.6f + Vector3.up * 1.4f) + Random.insideUnitSphere * 0.3f;
-        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        body.angularVelocity = Random.insideUnitSphere * 6f;
-        s.loose = body;
-        s.poppedAt = Bounds(s.shown).center;
-        s.poppedTime = Time.time;
+        Settle(s, at);
+        s.isLoose = true;
         loose.Add(s);
+        while (loose.Count > maxLoose) { Vanish(loose[0]); loose.RemoveAt(0); }
+    }
+
+    void Settle(Spot s, Vector3 from)
+    {
+        Vector3 floor = FloorUnder(OpenNear(from));
+        float size = s.kind.size * sizeScale;
+        Vector3 c = Bounds(s.shown).center;
+        s.shown.transform.position += floor + Vector3.up * size * 0.3f - c;   // its lower part in the soil
+    }
+
+    // The nearest open point beside or below `p` (never above it); `p` if it is open.
+    Vector3 OpenNear(Vector3 p)
+    {
+        if (!volume.Solid(p)) return p;
+        for (float r = 0.1f; r <= 1.2f; r += 0.1f)
+            for (int i = 0; i < 12; i++)
+            {
+                float a = i * Mathf.PI / 6f;
+                Vector3 side = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                Vector3 q = p + side * r;
+                if (!volume.Solid(q)) return q;
+                q = p + (side * 0.7f + Vector3.down * 0.7f) * r;
+                if (!volume.Solid(q)) return q;
+            }
+        return p;
+    }
+
+    // Straight down from an open point to where the earth begins.
+    Vector3 FloorUnder(Vector3 p)
+    {
+        for (int k = 0; k < 120 && !volume.Solid(p - Vector3.up * 0.05f); k++) p -= Vector3.up * 0.05f;
+        return p;
     }
 
     void Show(Spot s)
@@ -262,15 +241,12 @@ public class DigMinerals : MonoBehaviour
         foreach (var r in go.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         if (glintPrefab != null)
         {
+            // The prefab's own small, occasional sparkle, on the stone itself.
             var glint = Instantiate(glintPrefab, go.transform);
-            glint.transform.localPosition = Vector3.zero;
+            glint.transform.localPosition = go.transform.InverseTransformPoint(Bounds(go).center);
             glint.transform.localScale = Vector3.one / Mathf.Max(0.001f, scale);
             var main = glint.main;
             main.startColor = s.kind.glint;
-            main.startSizeMultiplier *= glintSize;
-            main.maxParticles = 6;
-            var emission = glint.emission;
-            emission.rateOverTimeMultiplier *= glintRate;
         }
         s.shown = go;
     }
@@ -279,8 +255,21 @@ public class DigMinerals : MonoBehaviour
     {
         var rs = go.GetComponentsInChildren<Renderer>();
         var b = rs.Length > 0 ? rs[0].bounds : new Bounds(go.transform.position, Vector3.zero);
-        foreach (var r in rs) b.Encapsulate(r.bounds);
+        foreach (var r in rs) if (!(r is ParticleSystemRenderer)) b.Encapsulate(r.bounds);
         return b;
+    }
+
+    // The aimed mineral is a touch brighter (no lights).
+    void Light(Spot s)
+    {
+        if (lit == s) return;
+        if (lit != null && lit.shown != null)
+            foreach (var r in lit.shown.GetComponentsInChildren<MeshRenderer>()) r.SetPropertyBlock(null);
+        lit = s;
+        if (s == null || s.shown == null) return;
+        if (glow == null) glow = new MaterialPropertyBlock();
+        glow.SetColor("_BaseColor", new Color(1.35f, 1.3f, 1.2f));
+        foreach (var r in s.shown.GetComponentsInChildren<MeshRenderer>()) r.SetPropertyBlock(glow);
     }
 
     void Update()
@@ -288,8 +277,9 @@ public class DigMinerals : MonoBehaviour
         var game = DigGame.I;
         if (game == null) return;
         Vector3 player = game.player.transform.position;
+        Light(aimed);
 
-        // Show what is near, hide what is far (a few times a second is plenty).
+        // Show what is near in the walls, hide what is far (a few times a second is plenty).
         checkTimer -= Time.deltaTime;
         if (checkTimer <= 0f)
         {
@@ -297,50 +287,30 @@ public class DigMinerals : MonoBehaviour
             float show2 = showDistance * showDistance;
             foreach (var s in spots)
             {
-                if (s.taken || s.loose != null) continue;
+                if (s.taken || s.isLoose) continue;
                 bool near = (s.position - player).sqrMagnitude < show2;
                 if (near && s.shown == null) Show(s);
                 else if (!near && s.shown != null) { Destroy(s.shown); s.shown = null; }
             }
         }
 
-        // Loose minerals rest where they fell until picked up.
+        // Loose minerals stay where they lie. If earth lands on one, or the ground under it
+        // is dug away, it settles again on the open ground beside or below.
         looseTimer -= Time.deltaTime;
-        bool looseCheck = looseTimer <= 0f;
-        if (looseCheck) looseTimer = 0.25f;
-        for (int i = loose.Count - 1; i >= 0; i--)
+        if (looseTimer <= 0f)
         {
-            var s = loose[i];
-            if (s.shown == null) { loose.RemoveAt(i); continue; }
-            // Earth tossed onto a resting stone (heaps), or fresh ground swapping its collider,
-            // can leave it inside the soil, where it would sink. It comes up to the surface
-            // of that earth instead, so a find is never lost.
-            // Once it has come to rest it stays put (no physics): the ground under it is rebuilt
-            // with every scoop nearby, and a sleeping body can drop through a swapped collider.
-            if (s.loose != null && looseCheck)
+            looseTimer = 0.25f;
+            for (int i = loose.Count - 1; i >= 0; i--)
             {
-                var body = s.loose;
-                Vector3 c = Bounds(s.shown).center, p = c;
-                if (c.y < s.poppedAt.y - 2.5f) p = s.poppedAt;
-                for (int k = 0; k < 40 && volume.Solid(p); k++) p += Vector3.up * 0.05f;
-                if (p != c)
-                {
-                    body.isKinematic = true;
-                    body.position += p - c + Vector3.up * 0.02f;
-                }
-                else if (!body.isKinematic && Time.time - s.poppedTime > 0.8f && body.linearVelocity.sqrMagnitude < 0.01f)
-                    body.isKinematic = true;
-                else if (body.isKinematic && !Physics.Raycast(c, Vector3.down, s.kind.size * sizeScale * 0.5f + 0.12f, DigGame.AimMask, QueryTriggerInteraction.Ignore))
-                {
-                    body.isKinematic = false;   // the ground under it was dug away: it falls again
-                    body.WakeUp();
-                }
+                var s = loose[i];
+                if (s.shown == null) { loose.RemoveAt(i); continue; }
+                Vector3 c = Bounds(s.shown).center;
+                float size = s.kind.size * sizeScale;
+                bool buried = volume.Solid(c + Vector3.up * size * 0.25f);
+                bool hanging = !volume.Solid(c - Vector3.up * (size * 0.5f + 0.08f));
+                if (buried || hanging) Settle(s, c);
             }
         }
-
-        // The soft light on the aimed one pulses gently.
-        if (highlight != null && highlight.enabled)
-            highlight.intensity = 0.9f + 0.35f * Mathf.Sin(Time.time * 4f);
 
         // Picked up: a short lift toward the camera, shrinking away.
         for (int i = lifting.Count - 1; i >= 0; i--)
@@ -357,11 +327,11 @@ public class DigMinerals : MonoBehaviour
         }
     }
 
-    // Demo jumps: minerals inside a freshly dug tunnel would hang in the air.
+    // Demo jumps: minerals laid bare by a freshly dug tunnel would hang in the air; they go.
     public void ClearInside(Vector3 a, float radius)
     {
         foreach (var s in spots)
-            if (!s.taken && s.loose == null && (s.position - a).sqrMagnitude < radius * radius && !volume.Solid(s.position))
-                PopOut(s, Vector3.up);
+            if (!s.taken && !s.isLoose && (s.position - a).sqrMagnitude < radius * radius && !volume.Solid(s.position))
+                Vanish(s);
     }
 }
