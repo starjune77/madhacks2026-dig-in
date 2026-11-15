@@ -12,7 +12,7 @@ using UnityEngine;
 // (DigLoosen), so they never float. Poly Haven models (CC0).
 public static partial class DigInSceneBuilder
 {
-    const string DigSpotVersion = "v3 lure";
+    const string DigSpotVersion = "v5 light flowers";
 
     static GameObject BuildDigSpot()
     {
@@ -39,22 +39,26 @@ public static partial class DigInSceneBuilder
         }
 
         // ---- A rough ring of wildflowers, mostly just outside the stones ----------------------
-        var flowers = new[] { PolyHavenAsset("dandelion_01"), PolyHavenAsset("celandine_01"), PolyHavenAsset("flower_heliophila") };
+        // Celandine is light (9k triangles); dandelions (64k) only now and then. Scanned
+        // plants are heavy: keep the count low and let them cast no shadows.
+        var celandine = PolyHavenAsset("celandine_01");
+        var dandelion = PolyHavenAsset("dandelion_01");
         const int clumps = 17;
         for (int i = 0; i < clumps; i++)
         {
             float a = (i + (float)rng.NextDouble() * 0.7f) / clumps * Mathf.PI * 2f;
             float r = 3.2f + (float)rng.NextDouble() * 0.5f;
-            var asset = flowers[rng.Next(flowers.Length)];
+            var asset = i % 4 == 1 ? dandelion : celandine;
             if (asset == null) continue;
             // A small clump of three or four, like flowers that seeded themselves.
-            int n = 3 + rng.Next(2);
+            int n = asset == dandelion ? 1 : 3 + rng.Next(2);
             for (int k = 0; k < n; k++)
             {
                 float x = DigStart.x + Mathf.Cos(a) * r + ((float)rng.NextDouble() - 0.5f) * 0.45f;
                 float z = DigStart.y + Mathf.Sin(a) * r + ((float)rng.NextDouble() - 0.5f) * 0.45f;
                 float h = Mathf.Lerp(0.26f, 0.42f, (float)rng.NextDouble());
                 var flower = PlaceAsset(t, asset, OnGround(x, z), (float)rng.NextDouble() * 360f, height: h);
+                foreach (var rend in flower.GetComponentsInChildren<Renderer>()) rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 Loosen(flower, debris);
             }
         }
