@@ -174,21 +174,26 @@ public class DigGame : MonoBehaviour
     }
 
     // ---- The bag and the shop ---------------------------------------------------
-    // A loose mineral the player walked over. False (and a hint) when the bag is full.
-    public bool TryBag(MineralData kind)
+    // E on a loose mineral: into the bag (it lifts toward you), or "Bag is full" and it stays.
+    public bool PickUpMineral()
     {
+        if (aimedMineral == null || minerals == null) return false;
         int size = shop != null ? shop.BagSize : 6;
         if (bag.Count >= size)
         {
-            if (Time.time > bagFullHint) { hud.ShowMessage("Your bag is full. Press <b>R</b> to go up and sell.", 3f); bagFullHint = Time.time + 6f; }
-            return false;
+            hud.ShowMessage("Bag is full.  <alpha=#BB>Press <b>R</b> to go up and sell.", 3f);
+            return true;
         }
+        var kind = minerals.PickUp(player.cam.position);
+        if (kind == null) return false;
         bag.Add(kind);
+        aimedMineral = null;
         hud.FlashScrap();
         DigAudio.I?.Mineral();
-        hud.ShowMessage("<b>" + kind.title + "</b>  <alpha=#BB><i>" + kind.line + "</i>", 3.5f);
+        hud.ShowMessage("<b>+1 " + kind.title + "</b>\n<size=75%><alpha=#BB><i>" + kind.line + "</i>", 3.5f);
         return true;
     }
+    MineralData aimedMineral;
     float bagFullHint;
     bool doorTried, catHinted, hasDug;
     [Header("Where to dig")]
@@ -453,6 +458,7 @@ public class DigGame : MonoBehaviour
     // E: looking at the cat pets it; anywhere else at the counter opens the shop.
     public void Interact()
     {
+        if (PickUpMineral()) return;   // a mineral under the crosshair comes first
         if (LookingAtCat()) { catHinted = true; shopCat.Pet(); return; }
         if (shop == null || workbench == null || !workbench.InRange(player.transform.position)) return;
         catHinted = true;   // you found the cat; it can tell you itself
@@ -469,6 +475,7 @@ public class DigGame : MonoBehaviour
 
     string ShopPrompt()
     {
+        if (aimedMineral != null) return "<b>E</b>  <alpha=#BB>pick up";
         if (shop == null || shop.IsOpen) return null;
         if (LookingAtCat()) return shopCat.Petting ? null : "<b>E</b>  <alpha=#BB>pet";
         if (workbench == null || !workbench.InRange(player.transform.position)) return null;
@@ -543,6 +550,7 @@ public class DigGame : MonoBehaviour
             hud.ShowMessage("The back door won't open. It's very quiet inside.", 4f);
         }
         hud.SetStatus(depth, ShovelName, coins, bag.Count, shop != null ? shop.BagSize : 6);
+        aimedMineral = minerals != null && !InputLocked ? minerals.Aim(new Ray(player.cam.position, player.cam.forward), player.reach + 0.4f) : null;
         string prompt = ShopPrompt();
         hud.SetPrompt(string.IsNullOrEmpty(prompt) && onSpot && !InputLocked ? digHint : prompt);
         if (atmosphere != null && shop != null) atmosphere.lanternPower = shop.LanternPower;

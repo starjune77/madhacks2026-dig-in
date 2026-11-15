@@ -4,8 +4,10 @@ using UnityEngine;
 // Minerals in the ground. Their spots are fixed (a seed), mostly near the life path, and
 // which kind lies where depends on the stratum. Near the player each one is shown where
 // it lies, inside the earth: only the part a wall cuts through shows, with a faint glint,
-// so they can be spotted. A scoop that reaches one pops it out; walking over it puts it
-// in the bag. Sits on "Dig Site/Minerals"; the kinds and the glint prefab are assets.
+// so they can be spotted. A scoop that reaches one pops it out and it comes to rest on the
+// ground, glinting. Aim at it within reach and it lights up softly; E picks it up (it lifts
+// toward you and is gone into the bag). Sits on "Dig Site/Minerals"; the kinds and the
+// glint prefab are assets.
 public class DigMinerals : MonoBehaviour
 {
     public DigVolume volume;
@@ -42,6 +44,68 @@ public class DigMinerals : MonoBehaviour
     readonly List<Spot> spots = new List<Spot>();
     readonly List<Spot> loose = new List<Spot>();
     float checkTimer;
+
+    // Picking up: the one under the crosshair, a soft light on it, and the ones lifting away.
+    Spot aimed;
+    Light highlight;
+    readonly List<(Transform t, Vector3 from, float time)> lifting = new List<(Transform, Vector3, float)>();
+
+    // The loose mineral the player is aiming at within reach (null if none).
+    public MineralData Aim(Ray ray, float reach)
+    {
+        aimed = null;
+        float best = float.MaxValue;
+        foreach (var s in loose)
+        {
+            if (s.shown == null || s.taken) continue;
+            Vector3 c = Bounds(s.shown).center;
+            Vector3 to = c - ray.origin;
+            float along = Vector3.Dot(to, ray.direction);
+            if (along < 0.2f || along > reach) continue;
+            float off = (to - ray.direction * along).magnitude;
+            float allowed = 0.12f + s.kind.size * 0.6f + along * 0.04f;   // a forgiving cone
+            if (off > allowed || off / allowed + along * 0.01f > best) continue;
+            best = off / allowed + along * 0.01f;
+            aimed = s;
+        }
+        UpdateHighlight();
+        return aimed?.kind;
+    }
+
+    // Picks up the aimed mineral: it lifts toward `to` and fades into the bag.
+    public MineralData PickUp(Vector3 to)
+    {
+        var s = aimed;
+        if (s == null || s.shown == null) return null;
+        s.taken = true;
+        loose.Remove(s);
+        aimed = null;
+        UpdateHighlight();
+        var go = s.shown;
+        if (s.loose != null) Destroy(s.loose);
+        foreach (var c in go.GetComponentsInChildren<Collider>()) Destroy(c);
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>()) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        lifting.Add((go.transform, go.transform.position, 0f));
+        liftTarget = to;
+        return s.kind;
+    }
+    Vector3 liftTarget;
+
+    void UpdateHighlight()
+    {
+        if (highlight == null)
+        {
+            highlight = new GameObject("Mineral Highlight").AddComponent<Light>();
+            highlight.transform.SetParent(transform, false);
+            highlight.type = LightType.Point;
+            highlight.color = new Color(1f, 0.9f, 0.72f);
+            highlight.range = 0.9f;
+            highlight.intensity = 0f;
+            highlight.shadows = LightShadows.None;
+        }
+        highlight.enabled = aimed != null && aimed.shown != null;
+        if (highlight.enabled) highlight.transform.position = Bounds(aimed.shown).center + Vector3.up * 0.3f;
+    }
 
     public int Count => spots.Count;
 
@@ -173,17 +237,30 @@ public class DigMinerals : MonoBehaviour
             }
         }
 
-        // Loose minerals near the player go into the bag.
+        // Loose minerals rest where they fell until picked up; any that fall out of the world go.
         for (int i = loose.Count - 1; i >= 0; i--)
         {
             var s = loose[i];
             if (s.shown == null) { loose.RemoveAt(i); continue; }
-            if (s.shown.transform.position.y < DigVolume.Min.y - 2f) { s.taken = true; Destroy(s.shown); loose.RemoveAt(i); continue; }
-            if ((s.shown.transform.position - player).sqrMagnitude > pickupDistance * pickupDistance) continue;
-            if (!game.TryBag(s.kind)) continue;
-            s.taken = true;
-            Destroy(s.shown);
-            loose.RemoveAt(i);
+            if (s.shown.transform.position.y < DigVolume.Min.y - 2f) { s.taken = true; Destroy(s.shown); loose.RemoveAt(i); }
+        }
+
+        // The soft light on the aimed one pulses gently.
+        if (highlight != null && highlight.enabled)
+            highlight.intensity = 0.9f + 0.35f * Mathf.Sin(Time.time * 4f);
+
+        // Picked up: a short lift toward the camera, shrinking away.
+        for (int i = lifting.Count - 1; i >= 0; i--)
+        {
+            var (t, from, time) = lifting[i];
+            if (t == null) { lifting.RemoveAt(i); continue; }
+            time += Time.deltaTime / 0.3f;
+            float e = Mathf.SmoothStep(0f, 1f, time);
+            Vector3 target = game.player.cam.position + game.player.cam.forward * 0.35f - game.player.cam.up * 0.12f;
+            t.position = Vector3.Lerp(from, target, e) + Vector3.up * Mathf.Sin(e * Mathf.PI) * 0.12f;
+            t.localScale *= 1f - Time.deltaTime * 2.2f * e;
+            if (time >= 1f) { Destroy(t.gameObject); lifting.RemoveAt(i); }
+            else lifting[i] = (t, from, time);
         }
     }
 
