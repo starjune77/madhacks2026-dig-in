@@ -82,6 +82,7 @@ public class DigDebris : MonoBehaviour
     int next;
     int debrisLayer;
     float flushTimer;
+    float nextThud;
     bool depositsPending;
 
     void Awake()
@@ -222,6 +223,11 @@ public class DigDebris : MonoBehaviour
         var c = clods[index];
         if (c.landed) return;
         c.landed = true;      // only the first hard landing counts
+        if (c.size > 0.07f && speed > 1.5f && Time.time > nextThud)
+        {
+            nextThud = Time.time + 0.09f;
+            DigAudio.I?.ClodLanded(c.transform.position, speed / 5f);
+        }
         if (c.size < breakSize || speed < breakSpeed || Random.value > breakChance) return;
 
         // Break into two to four pieces that carry on in the same direction.

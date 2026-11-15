@@ -49,6 +49,7 @@ public class DigStory : MonoBehaviour
     public void ShowCard(MemoryData data)
     {
         hud.ShowCard(data);
+        DigAudio.I?.Page();
         cardStratum = data.stratum;
         Open(Mode.Card);
     }
@@ -56,6 +57,7 @@ public class DigStory : MonoBehaviour
     void ShowLetter(int stratum)
     {
         letterShown[stratum] = true;
+        DigAudio.I?.Page();
         var l = letters[stratum];
         hud.OpenLines(hud.letter, l.title, l.lines);
         revealTime = 0f;

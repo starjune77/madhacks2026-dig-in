@@ -122,11 +122,13 @@ public class DigGame : MonoBehaviour
 
         if (volume.IsProtected(inside))
         {
+            DigAudio.I?.Bounce(hit.point);
             debris.Chips(hit.point, hit.normal, stratum);
             return DigOutcome.Protected;
         }
         if (stratum > shovelLevel)
         {
+            DigAudio.I?.Bounce(hit.point);
             debris.Chips(hit.point, hit.normal, stratum);
             hud.ShowMessage("This ground is too hard for the " + ShovelName + ".");
             return DigOutcome.TooHard;
@@ -136,6 +138,7 @@ public class DigGame : MonoBehaviour
         Vector3 center = hit.point + viewDirection * (radius * 0.35f);   // bite into the surface, not on it
         scoops.Begin(center, radius, viewDirection, shovelLevel, stratum, ScoopDone);
         debris.Impact(hit.point, hit.normal, -viewDirection, stratum);
+        DigAudio.I?.Dig(stratum, hit.point);
 
         lastStratum = stratum;
         lastAmount = radius / shovelRadius[shovelLevel];
@@ -151,6 +154,7 @@ public class DigGame : MonoBehaviour
         if (!tossPending) return;
         tossPending = false;
         debris.Toss(from, direction, lastStratum, lastAmount);
+        DigAudio.I?.Toss(from);
     }
 
     void ScoopDone(Vector3 center, float radius, float volumeRemoved)
@@ -171,6 +175,7 @@ public class DigGame : MonoBehaviour
         }
         bag.Add(kind);
         hud.FlashScrap();
+        DigAudio.I?.Mineral();
         hud.ShowMessage("<b>" + kind.title + "</b>  <alpha=#BB><i>" + kind.line + "</i>", 3.5f);
         return true;
     }

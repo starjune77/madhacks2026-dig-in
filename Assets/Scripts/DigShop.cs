@@ -59,6 +59,7 @@ public class DigShop : MonoBehaviour
     {
         IsOpen = true;
         openedFrame = Time.frameCount;
+        DigAudio.I?.Meow();
         visits++;
         // The first visit is ordinary. Later, now and then, the cat knows too much.
         string line = Pick(greetings);
@@ -91,6 +92,7 @@ public class DigShop : MonoBehaviour
     {
         int coins = game.SellBag(out int count);
         Refresh(count == 0 ? Pick(onNothing) : Pick(onSell) + "  <alpha=#99>(+" + coins + " coins)");
+        if (count > 0) DigAudio.I?.Mineral();
     }
 
     public void BuySpade() => Buy(ref game.shovelLevel, spadePrices, () => game.shovel.SetLevel(game.shovelLevel));
@@ -105,6 +107,7 @@ public class DigShop : MonoBehaviour
         game.coins -= price;
         level++;
         after?.Invoke();
+        DigAudio.I?.Page();
         Refresh(Pick(onBuy));
     }
 

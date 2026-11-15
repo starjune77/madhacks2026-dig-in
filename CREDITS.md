@@ -17,7 +17,22 @@ All from [Poly Haven](https://polyhaven.com), licensed [CC0](https://polyhaven.c
 
 ## Models
 
-- [Kenney](https://kenney.nl) Nature Kit, Survival Kit, Furniture Kit and Fantasy Town Kit, [CC0](https://creativecommons.org/publicdomain/zero/1.0/). Being replaced by realistic assets.
+- **Meshy** (generated on a paid plan with full commercial rights): the house, the picket fence, the spade, the memory bookshelf, the shop counter, the cat (sitting and sleeping), the bed, and the eleven minerals. In `Assets/ThirdParty/Meshy/`.
+- **[Poly Haven](https://polyhaven.com)** models, [CC0](https://polyhaven.com/license), in `Assets/ThirdParty/PolyHaven/Models/`: Wooden Barrels 01, Watering Can Metal 01, Wicker Basket 01, Planter Pot Clay, Garden Gnome, Wooden Crate 01, Wooden Ladder, Tree Stump 01, Dead Tree Trunk, Boulder 01, Rock Moss Set 01, Shrub 02, Shrub 04, Fern 02, Wooden Table 03, Rocking Chair 01.
+- **[Unity Terrain - URP Demo Scene](https://assetstore.unity.com/packages/3d/environments/unity-terrain-urp-demo-scene-213197)** by Unity Technologies, under the [Unity Asset Store EULA](https://unity.com/legal/as-terms) (Standard Unity Asset Store license). Used: the SpeedTree conifer and cypress, grass, fern and bush detail meshes, and the Grass_A and Grass_Soil_A terrain layers (re-encoded at 2K). In `Assets/ThirdParty/UnityTerrainDemo/`.
+
+## Sound
+
+All recorded foley from [OpenGameArt](https://opengameart.org), licensed [CC0](https://creativecommons.org/publicdomain/zero/1.0/). In `Assets/Audio/`.
+
+| Sound | Source |
+|---|---|
+| Digging into soil (`Dig/Dig_*`) | [25 CC0 mud SFX](https://opengameart.org/content/25-cc0-mud-sfx) |
+| Shovel on stone, footsteps, mineral clinks (`Dig/Stone_*`, `Steps/*`, `Minerals/*`) | [100 CC0 SFX #2](https://opengameart.org/content/100-cc0-sfx-2) |
+| Pages for cards, letters and the shop (`UI/*`) | [Book Flip Sounds](https://opengameart.org/content/book-flip-sounds) |
+| Cat meows and purrs (`Cat/*`) | [Cat Purr & Meow](https://opengameart.org/content/cat-purr-meow) |
+| Birds and wind (`Ambience/Birds`, `Ambience/Wind`, cut into 60 s mono loops) | [Park Ambiences](https://opengameart.org/content/park-ambiences) |
+| The underground hum (`Ambience/Underground`) | [Loopable Dungeon Ambience](https://opengameart.org/content/loopable-dungeon-ambience) |
 
 ## Fonts
 

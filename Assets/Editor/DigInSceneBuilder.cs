@@ -1073,6 +1073,9 @@ public static partial class DigInSceneBuilder
         if (story == null) story = gameRoot.gameObject.AddComponent<DigStory>();
         var shop = gameRoot.GetComponent<DigShop>();
         if (shop == null) shop = gameRoot.gameObject.AddComponent<DigShop>();
+        var audio = gameRoot.GetComponent<DigAudio>();
+        if (audio == null) audio = gameRoot.gameObject.AddComponent<DigAudio>();
+        WireAudio(audio);
 
         var player = Find<DigPlayer>(scene);
         if (game.volume == null) game.volume = Find<DigVolume>(scene);

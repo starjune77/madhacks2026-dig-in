@@ -4036,6 +4036,7 @@ GameObject:
   - component: {fileID: 1016677363}
   - component: {fileID: 1016677362}
   - component: {fileID: 1016677364}
+  - component: {fileID: 1016677365}
   m_Layer: 0
   m_Name: Game
   m_TagString: Untagged
@@ -4268,6 +4269,76 @@ MonoBehaviour:
   - You're the one who left that window open, every summer.
   - You always say you'll call back. You will, this time.
   - It's later than it looks out here.
+--- !u!114 &1016677365
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1016677358}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54392cb15579f194eba8143a65d24a5a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DigAudio
+  digDirt:
+  - {fileID: 8300000, guid: a654b54dd690ead4882702d7b076f625, type: 3}
+  - {fileID: 8300000, guid: 89d01cda9e268ce468a2962f8b8e6251, type: 3}
+  - {fileID: 8300000, guid: b0d3c5fcfc7f0934eb041e9b2e244879, type: 3}
+  - {fileID: 8300000, guid: 9160d22766be530428e292ff8b16a47f, type: 3}
+  - {fileID: 8300000, guid: 9ca5f44dece2fb043acec41ca110e312, type: 3}
+  - {fileID: 8300000, guid: 42a5f8355009b5249903cb853f3ea0d2, type: 3}
+  - {fileID: 8300000, guid: 0f2e106964d745b40bdb6adf6f0097a8, type: 3}
+  - {fileID: 8300000, guid: d3eaef1eac4427041abf472d6dca3f68, type: 3}
+  - {fileID: 8300000, guid: 7922872b867aae44d851ae6961e6f714, type: 3}
+  - {fileID: 8300000, guid: aaa1cbf5a8363694184941e41d9263f7, type: 3}
+  - {fileID: 8300000, guid: ddfad17687f2cbb41ba76925e9acacf3, type: 3}
+  digStone:
+  - {fileID: 8300000, guid: faa2692bb6ad47f4389f3060c18f24bf, type: 3}
+  - {fileID: 8300000, guid: b08e0a2a64dd55f419ad8b4cbd42ad96, type: 3}
+  - {fileID: 8300000, guid: 2974cdeb950f6c943b28cd0974b47f7f, type: 3}
+  clods:
+  - {fileID: 8300000, guid: a654b54dd690ead4882702d7b076f625, type: 3}
+  - {fileID: 8300000, guid: 89d01cda9e268ce468a2962f8b8e6251, type: 3}
+  - {fileID: 8300000, guid: b0d3c5fcfc7f0934eb041e9b2e244879, type: 3}
+  - {fileID: 8300000, guid: 9160d22766be530428e292ff8b16a47f, type: 3}
+  - {fileID: 8300000, guid: 9ca5f44dece2fb043acec41ca110e312, type: 3}
+  - {fileID: 8300000, guid: 42a5f8355009b5249903cb853f3ea0d2, type: 3}
+  - {fileID: 8300000, guid: 0f2e106964d745b40bdb6adf6f0097a8, type: 3}
+  - {fileID: 8300000, guid: d3eaef1eac4427041abf472d6dca3f68, type: 3}
+  - {fileID: 8300000, guid: 7922872b867aae44d851ae6961e6f714, type: 3}
+  - {fileID: 8300000, guid: aaa1cbf5a8363694184941e41d9263f7, type: 3}
+  - {fileID: 8300000, guid: ddfad17687f2cbb41ba76925e9acacf3, type: 3}
+  steps:
+  - {fileID: 8300000, guid: ccf3b61c0a895a7489a266815fdda60e, type: 3}
+  - {fileID: 8300000, guid: f6d4d5e0fa012df43bec8bea215cdc2e, type: 3}
+  - {fileID: 8300000, guid: 1655ab9a5f7268e4a9fb7e8ada21d8c9, type: 3}
+  - {fileID: 8300000, guid: 8631f1d51a0d4b74e8b85653c0599f69, type: 3}
+  - {fileID: 8300000, guid: 842f81aaeb833ed43862c7155a701d22, type: 3}
+  mineral:
+  - {fileID: 8300000, guid: e793171aabb39ad42ad9964fc421e532, type: 3}
+  - {fileID: 8300000, guid: 2a65a649e46adbd4aa93ca5aaeb587e8, type: 3}
+  - {fileID: 8300000, guid: 475b8f8ede6826c42b239e16344bae49, type: 3}
+  - {fileID: 8300000, guid: 9bd3c78a8a4cd4441ba3c855c3ecc190, type: 3}
+  page:
+  - {fileID: 8300000, guid: 6487a714fb30f1644acab09a7da1e679, type: 3}
+  - {fileID: 8300000, guid: e15007f27b1390046bd7eac82dd0787f, type: 3}
+  - {fileID: 8300000, guid: aabfea18b0c12414e861a9c7df5a1dc0, type: 3}
+  - {fileID: 8300000, guid: 79f73646a23f4b144aa76c490ba8808d, type: 3}
+  meow:
+  - {fileID: 8300000, guid: 00e3c0d73330ed44a9469ff360a475c7, type: 3}
+  - {fileID: 8300000, guid: 4ef907b7713ff8341a242e983c460926, type: 3}
+  - {fileID: 8300000, guid: 0a1dcade7b27db14981cd4fa34b65872, type: 3}
+  purr: {fileID: 8300000, guid: 8eabe625d15fd3641817a39cfb687c40, type: 3}
+  sleepyPurr: {fileID: 8300000, guid: 1340f4cb844e39449b117785d27c2f42, type: 3}
+  birds: {fileID: 8300000, guid: d96fccacbbb48cf40988998d0969a0a5, type: 3}
+  wind: {fileID: 8300000, guid: fe5e043583771524ebb2a96037ed4ce5, type: 3}
+  underground: {fileID: 8300000, guid: a734ce7893407ad4c8f5f89a6fbec874, type: 3}
+  master: 0.8
+  effects: 0.55
+  ambience: 0.35
+  pitchSpread: 0.08
+  fullDepth: 6
 --- !u!1001 &1116830066
 PrefabInstance:
   m_ObjectHideFlags: 0
