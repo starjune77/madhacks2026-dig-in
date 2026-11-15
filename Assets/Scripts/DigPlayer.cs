@@ -89,6 +89,19 @@ public class DigPlayer : MonoBehaviour
         var mouse = Mouse.current;
         if (kb == null || mouse == null) return;
 
+        // The shop frees the cursor while it is open; its own Esc and clicks are not ours.
+        bool shopOpen = DigGame.I.shop != null && DigGame.I.shop.IsOpen;
+        bool shopJustClosed = Time.frameCount - DigShop.LastClosedFrame <= 1;
+        if (shopOpen || shopJustClosed)
+        {
+            waitForRelease = true;   // the click that closes the shop must not swing
+            velocity = Vector3.zero;
+            lookRate = Vector2.zero;
+            DigGame.I.HideAim();
+            UpdateCamera();
+            return;
+        }
+
         if (kb.escapeKey.wasPressedThisFrame) LockCursor(false);
         if (Cursor.lockState != CursorLockMode.Locked)
         {

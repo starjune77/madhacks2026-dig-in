@@ -42,7 +42,7 @@ public static partial class DigInSceneBuilder
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v5 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v8 demo shop";
+    const string HudVersion = "v11 mouse shop";
     const string HubVersion = "v6 cat";              // marker child of scene/Surface Hub
     const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
@@ -140,6 +140,13 @@ public static partial class DigInSceneBuilder
         var player = Root(scene, "Player", out bool newPlayer, playerPrefab);
         if (newPlayer) player.position = SpawnPos;
         Root(scene, "HUD", out _, hudPrefab);
+        // Clicks on UI (the shop) go through the Input System's UI module.
+        var events = Root(scene, "EventSystem", out bool newEvents);
+        if (newEvents)
+        {
+            events.gameObject.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            events.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+        }
 
         // The template's camera is replaced by the one in the Player prefab.
         foreach (var go in scene.GetRootGameObjects())
@@ -718,6 +725,7 @@ public static partial class DigInSceneBuilder
         var canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 10;
+        root.AddComponent<GraphicRaycaster>();   // the shop's buttons
         var scaler = root.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -1111,6 +1119,11 @@ public static partial class DigInSceneBuilder
         EditorUtility.SetDirty(game);
 
         if (shop.hud == null) shop.hud = game.hud;
+        foreach (var l in Object.FindObjectsByType<DigLoosen>(FindObjectsInactive.Include))
+        {
+            l.volume = game.volume;
+            EditorUtility.SetDirty(l);
+        }
         EditorUtility.SetDirty(shop);
         if (story.game == null) story.game = game;
         if (story.hud == null) story.hud = game.hud;

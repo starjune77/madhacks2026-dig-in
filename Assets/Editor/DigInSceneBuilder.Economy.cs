@@ -108,22 +108,86 @@ public static partial class DigInSceneBuilder
         return go;
     }
 
-    // The cat's price board: warm paper on the right, the cat's words underneath.
+    // The cat's price board: warm paper on the right side of the screen, with real buttons.
+    // Rows for the stones in the bag (each with Sell), Sell All, three upgrades (each with
+    // Buy and its price), a Close button and the cat's words. DigShop fills it.
     static void BuildShopUi(Transform root, DigHud hud, TMP_FontAsset font, TMP_FontAsset italic)
     {
-        var node = UiNode("Shop", root, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-70f, 0f), new Vector2(760f, 640f));
+        const float W = 760f, H = 900f;
+        var node = UiNode("Shop", root, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-60f, 0f), new Vector2(W, H));
         node.pivot = new Vector2(1f, 0.5f);
         hud.shopGroup = node.gameObject.AddComponent<CanvasGroup>();
         hud.shopGroup.alpha = 0f;
         hud.shopGroup.blocksRaycasts = false;
-        var paper = Paper("Board", node, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(740f, 620f));
-        paper.color = new Color(0.93f, 0.86f, 0.72f, 0.97f);
-
+        hud.shopGroup.interactable = false;
+        var paper = Paper("Board", node, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(W - 20f, H - 20f));
+        paper.color = new Color(0.93f, 0.86f, 0.72f, 0.98f);
+        var p = paper.transform;
         var top = new Vector2(0.5f, 1f);
-        var title = Ink("Title", paper.transform, font, 30f, TextAlignmentOptions.Center, "The Shop", top, new Vector2(0f, -46f), new Vector2(640f, 46f), 0.75f);
+
+        var title = Ink("Title", p, font, 34f, TextAlignmentOptions.Center, "The Shop", top, new Vector2(0f, -44f), new Vector2(500f, 50f), 0.8f);
         title.characterSpacing = 4f;
-        hud.shopBoard = Ink("Prices", paper.transform, italic, 30f, TextAlignmentOptions.TopLeft, "1   Sell", top, new Vector2(0f, -110f), new Vector2(640f, 330f));
-        hud.shopBoard.lineSpacing = 18f;
-        hud.shopCat = Ink("Cat", paper.transform, italic, 28f, TextAlignmentOptions.Center, "“Mrrp.”", new Vector2(0.5f, 0f), new Vector2(0f, 46f), new Vector2(640f, 110f), 0.85f);
+        hud.shopClose = ShopButton("Close", p, new Vector2(1f, 1f), new Vector2(-24f, -24f), new Vector2(120f, 50f), font, "Close", out _);
+        ((RectTransform)hud.shopClose.transform).pivot = new Vector2(1f, 1f);
+
+        Ink("Bag Header", p, italic, 24f, TextAlignmentOptions.Left, "In your bag", top, new Vector2(0f, -112f), new Vector2(640f, 36f), 0.6f);
+        hud.shopEmpty = Ink("Empty", p, italic, 26f, TextAlignmentOptions.Left, "Nothing yet. Go and dig.", top, new Vector2(0f, -160f), new Vector2(640f, 40f), 0.7f);
+        hud.shopRows = new DigHud.ShopRow[7];
+        for (int i = 0; i < hud.shopRows.Length; i++)
+            hud.shopRows[i] = ShopRow("Stone " + (i + 1), p, -158f - i * 46f, font, italic, "Sell");
+        hud.shopSellAll = ShopRow("Sell All", p, -158f - 7 * 46f - 6f, font, italic, "Sell all");
+        hud.shopSellAll.label.text = "";
+
+        Ink("Upgrades Header", p, italic, 24f, TextAlignmentOptions.Left, "For the next dig", top, new Vector2(0f, -548f), new Vector2(640f, 36f), 0.6f);
+        hud.shopUpgrades = new[]
+        {
+            ShopRow("Spade", p, -590f, font, italic, "Buy"),
+            ShopRow("Bag", p, -636f, font, italic, "Buy"),
+            ShopRow("Lantern", p, -682f, font, italic, "Buy"),
+        };
+        hud.shopCoins = Ink("Coins", p, font, 26f, TextAlignmentOptions.Left, "You have 0 coins", top, new Vector2(0f, -748f), new Vector2(640f, 40f), 0.85f);
+        hud.shopCat = Ink("Cat", p, italic, 26f, TextAlignmentOptions.Center, "“Mrrp.”", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(660f, 60f), 0.85f);
+    }
+
+    // A label on the left and a button on the right, 640 px wide, at `y` from the top.
+    static DigHud.ShopRow ShopRow(string name, Transform parent, float y, TMP_FontAsset font, TMP_FontAsset italic, string buttonText)
+    {
+        var top = new Vector2(0.5f, 1f);
+        var row = UiNode(name, parent, top, top, new Vector2(0f, y), new Vector2(640f, 44f));
+        row.pivot = new Vector2(0.5f, 1f);
+        var label = Ink("Label", row, italic, 27f, TextAlignmentOptions.Left, name, new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(380f, 44f));
+        ((RectTransform)label.transform.parent).pivot = new Vector2(0f, 0.5f);
+        var button = ShopButton("Button", row, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(250f, 42f), font, buttonText, out var buttonLabel);
+        ((RectTransform)button.transform).pivot = new Vector2(1f, 0.5f);
+        return new DigHud.ShopRow { root = row.gameObject, label = label, button = button, buttonLabel = buttonLabel };
+    }
+
+    // A warm, ink-coloured button: lighter on hover, darker when pressed, faded when it
+    // cannot be used (not enough coins).
+    static Button ShopButton(string name, Transform parent, Vector2 anchor, Vector2 pos, Vector2 size, TMP_FontAsset font, string text, out TMP_Text label)
+    {
+        var node = UiNode(name, parent, anchor, anchor, pos, size);
+        var img = node.gameObject.AddComponent<Image>();
+        img.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        img.type = Image.Type.Sliced;
+        img.color = Color.white;
+        img.raycastTarget = true;
+        var button = node.gameObject.AddComponent<Button>();
+        button.targetGraphic = img;
+        var colors = button.colors;
+        colors.normalColor = new Color(0.42f, 0.29f, 0.19f);
+        colors.highlightedColor = new Color(0.62f, 0.44f, 0.27f);
+        colors.pressedColor = new Color(0.30f, 0.20f, 0.13f);
+        colors.selectedColor = colors.normalColor;
+        colors.disabledColor = new Color(0.55f, 0.5f, 0.45f, 0.45f);
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.08f;
+        button.colors = colors;
+        var nav = button.navigation;
+        nav.mode = Navigation.Mode.None;   // no keyboard focus ring; the mouse is the way
+        button.navigation = nav;
+        label = Text("Label", node, font, font.material, 24f, TextAlignmentOptions.Center, text, Vector2.zero, size, stretch: true);
+        label.color = new Color(0.98f, 0.94f, 0.86f);
+        return button;
     }
 }

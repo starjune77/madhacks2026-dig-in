@@ -60,8 +60,24 @@ public class DigHud : MonoBehaviour
 
     [Header("The cat's shop")]
     public CanvasGroup shopGroup;
-    public TMP_Text shopBoard;
     public TMP_Text shopCat;
+    public TMP_Text shopCoins;
+    public TMP_Text shopEmpty;
+    [Tooltip("One row per kind of stone in the bag (unused rows are hidden).")]
+    public ShopRow[] shopRows;
+    public ShopRow shopSellAll;
+    [Tooltip("Spade, bag, lantern.")]
+    public ShopRow[] shopUpgrades;
+    public Button shopClose;
+
+    [System.Serializable]
+    public class ShopRow
+    {
+        public GameObject root;
+        public TMP_Text label;
+        public Button button;
+        public TMP_Text buttonLabel;
+    }
 
     [Header("Demo mode badge")]
     public CanvasGroup demoGroup;
@@ -117,14 +133,16 @@ public class DigHud : MonoBehaviour
         if (scrapText != null) scrapText.text = coins + " coins    <alpha=#AA>bag " + bagCount + " / " + bagSize;
     }
 
-    // The cat's price board. `board` and `catLine` are rich text; null hides it.
-    public void ShowShop(bool visible, string board, string catLine)
+    // The cat's price board (DigShop fills it).
+    public void ShowShop(bool visible)
     {
         shopVisible = visible;
-        if (!visible) return;
-        if (shopBoard != null) shopBoard.text = board;
-        if (shopCat != null) shopCat.text = "\u201C" + catLine + "\u201D";
-        messageTimer = 0f;
+        if (visible) messageTimer = 0f;
+        if (shopGroup != null)
+        {
+            shopGroup.blocksRaycasts = visible;
+            shopGroup.interactable = visible;
+        }
     }
 
     public void FlashScrap()

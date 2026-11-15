@@ -1,10 +1,9 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// The cat's shop by the house. Walk up to the counter and press E: the price board opens.
-//   1  sell everything in the bag
-//   2  the next spade      3  a bigger bag      4  a brighter lantern
-//   E or Esc  close
+// The cat's shop by the house. Walk up to the counter and press E: the price board opens
+// and the cursor is freed. Click Sell on a kind of stone, Sell All, or Buy on an upgrade;
+// Close (or Esc, or E) leaves. Number keys still work: 1 sell all, 2 spade, 3 bag, 4 lantern.
 // The cat says a short line for each. Prices and lines are inspector data. Sits on "Game".
 public class DigShop : MonoBehaviour
 {
@@ -55,6 +54,13 @@ public class DigShop : MonoBehaviour
     public int BagSize => bagSizes[Mathf.Clamp(game.bagLevel, 0, bagSizes.Length - 1)];
     public float LanternPower => lanternPower[Mathf.Clamp(game.lanternLevel, 0, lanternPower.Length - 1)];
 
+    // The frame the shop last closed: that frame's Esc or click belongs to the shop, not
+    // to the player (DigPlayer checks it so the cursor stays locked and nothing digs).
+    public static int LastClosedFrame { get; private set; } = -10;
+
+    MineralData[] rowKinds;
+    bool wired;
+
     public void Open()
     {
         IsOpen = true;
@@ -65,14 +71,39 @@ public class DigShop : MonoBehaviour
         string line = Pick(greetings);
         if (visits > 1 && Random.value < Mathf.Lerp(0.2f, 0.6f, Mathf.Clamp01(game.DeepestDepth / 25f)))
             line = knowing[Mathf.Min(knowingIndex++, knowing.Length - 1)];
+        Wire();
+        // The mouse is the main way to trade: free the cursor while the shop is open.
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
         Refresh(line);
     }
     int knowingIndex;
 
     public void Close()
     {
+        if (!IsOpen) return;
         IsOpen = false;
-        hud.ShowShop(false, null, null);
+        LastClosedFrame = Time.frameCount;
+        hud.ShowShop(false);
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    // Hooks the price board's buttons to the shop (once).
+    void Wire()
+    {
+        if (wired) return;
+        wired = true;
+        for (int i = 0; i < hud.shopRows.Length; i++)
+        {
+            int row = i;
+            hud.shopRows[i].button.onClick.AddListener(() => { if (rowKinds != null && row < rowKinds.Length && rowKinds[row] != null) SellKind(rowKinds[row]); });
+        }
+        hud.shopSellAll.button.onClick.AddListener(Sell);
+        hud.shopUpgrades[0].button.onClick.AddListener(BuySpade);
+        hud.shopUpgrades[1].button.onClick.AddListener(BuyBag);
+        hud.shopUpgrades[2].button.onClick.AddListener(BuyLantern);
+        hud.shopClose.onClick.AddListener(Close);
     }
 
     void Update()
@@ -80,6 +111,7 @@ public class DigShop : MonoBehaviour
         if (!IsOpen || Time.frameCount == openedFrame) return;
         var kb = Keyboard.current;
         if (kb == null) return;
+        // Keys still work as a fallback.
         if (kb.eKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame) { Close(); return; }
         if (kb.digit1Key.wasPressedThisFrame) Sell();
         else if (kb.digit2Key.wasPressedThisFrame) BuySpade();
@@ -93,6 +125,22 @@ public class DigShop : MonoBehaviour
         int coins = game.SellBag(out int count);
         Refresh(count == 0 ? Pick(onNothing) : Pick(onSell) + "  <alpha=#99>(+" + coins + " coins)");
         if (count > 0) DigAudio.I?.Mineral();
+    }
+
+    // Sells every stone of one kind.
+    public void SellKind(MineralData kind)
+    {
+        int count = 0, coins = 0;
+        for (int i = game.bag.Count - 1; i >= 0; i--)
+        {
+            if (game.bag[i] != kind) continue;
+            coins += kind.value;
+            count++;
+            game.bag.RemoveAt(i);
+        }
+        game.coins += coins;
+        if (count > 0) DigAudio.I?.Mineral();
+        Refresh(count == 0 ? Pick(onNothing) : Pick(onSell) + "  <alpha=#99>(+" + coins + " coins)");
     }
 
     public void BuySpade() => Buy(ref game.shovelLevel, spadePrices, () => game.shovel.SetLevel(game.shovelLevel));
@@ -111,27 +159,55 @@ public class DigShop : MonoBehaviour
         Refresh(Pick(onBuy));
     }
 
+    // Fills the price board: one row per kind of stone in the bag, Sell All, the upgrades.
     void Refresh(string catLine)
     {
-        string Row(string key, string what, int level, int[] prices, string[] names)
+        Wire();
+        // The bag, grouped by kind, most valuable first.
+        var counts = new System.Collections.Generic.Dictionary<MineralData, int>();
+        foreach (var m in game.bag) { counts.TryGetValue(m, out int c); counts[m] = c + 1; }
+        var kinds = new System.Collections.Generic.List<MineralData>(counts.Keys);
+        kinds.Sort((a, b) => b.value.CompareTo(a.value));
+        rowKinds = new MineralData[hud.shopRows.Length];
+        for (int i = 0; i < hud.shopRows.Length; i++)
         {
-            if (level >= prices.Length - 1) return "<alpha=#66>" + key + "   " + what + " - the best there is<alpha=#FF>";
-            string next = names != null ? names[level + 1] : what;
-            string price = prices[level + 1] + " coins";
-            bool can = game.coins >= prices[level + 1];
-            return key + "   " + next + "  " + (can ? "" : "<alpha=#77>") + price + (can ? "" : "<alpha=#FF>");
+            var row = hud.shopRows[i];
+            bool used = i < kinds.Count;
+            row.root.SetActive(used);
+            if (!used) continue;
+            var k = kinds[i];
+            rowKinds[i] = k;
+            row.label.text = k.title + "  <alpha=#99>×" + counts[k];
+            row.buttonLabel.text = "Sell  " + (k.value * counts[k]) + " coins";
+            row.button.interactable = true;
         }
-        string bagNames(int i) => bagSizes[i] + " stones";
-        var bagLabels = new string[bagSizes.Length];
-        for (int i = 0; i < bagLabels.Length; i++) bagLabels[i] = "A bag for " + bagNames(i);
+        if (hud.shopEmpty != null) hud.shopEmpty.gameObject.SetActive(kinds.Count == 0);
+        hud.shopSellAll.button.interactable = game.bag.Count > 0;
+        hud.shopSellAll.buttonLabel.text = "Sell all  " + game.BagValue + " coins";
 
-        string board =
-            "1   Sell what's in the bag  <alpha=#99>(" + game.BagCount + " stones, " + game.BagValue + " coins)<alpha=#FF>\n" +
-            Row("2", "Spade", game.shovelLevel, spadePrices, spadeNames) + "\n" +
-            Row("3", "Bag", game.bagLevel, bagPrices, bagLabels) + "\n" +
-            Row("4", "Lantern", game.lanternLevel, lanternPrices, lanternNames) + "\n\n" +
-            "<alpha=#99>You have " + game.coins + " coins.     E  leave<alpha=#FF>";
-        hud.ShowShop(true, board, catLine);
+        var bagLabels = new string[bagSizes.Length];
+        for (int i = 0; i < bagLabels.Length; i++) bagLabels[i] = "A bag for " + bagSizes[i] + " stones";
+        Upgrade(hud.shopUpgrades[0], game.shovelLevel, spadePrices, spadeNames);
+        Upgrade(hud.shopUpgrades[1], game.bagLevel, bagPrices, bagLabels);
+        Upgrade(hud.shopUpgrades[2], game.lanternLevel, lanternPrices, lanternNames);
+
+        hud.shopCoins.text = "You have " + game.coins + " coins";
+        hud.ShowShop(true);
+        if (hud.shopCat != null) hud.shopCat.text = "“" + catLine + "”";
+    }
+
+    void Upgrade(DigHud.ShopRow row, int level, int[] prices, string[] names)
+    {
+        if (level >= prices.Length - 1)
+        {
+            row.label.text = names[names.Length - 1] + "  <alpha=#88>(yours)";
+            row.buttonLabel.text = "The best there is";
+            row.button.interactable = false;
+            return;
+        }
+        row.label.text = names[level + 1];
+        row.buttonLabel.text = "Buy  " + prices[level + 1] + " coins";
+        row.button.interactable = game.coins >= prices[level + 1];
     }
 
     static string Pick(string[] lines) => lines[Random.Range(0, lines.Length)];
