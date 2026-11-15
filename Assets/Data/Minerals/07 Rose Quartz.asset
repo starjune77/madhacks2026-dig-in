@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caef213a6e5335e409f119e7d00b1d5c, type: 3}
+  m_Name: 07 Rose Quartz
+  m_EditorClassIdentifier: Assembly-CSharp::MineralData
+  title: Rose Quartz
+  line: Soft pink, like the first time someone held your hand.
+  value: 22
+  weightByStratum: {x: 0.3, y: 0.8, z: 0.8}
+  model: {fileID: 919132149155446097, guid: b4c76d3859329d04386757a5d0494e34, type: 3}
+  size: 0.14
+  glint: {r: 1, g: 0.8, b: 0.88, a: 1}

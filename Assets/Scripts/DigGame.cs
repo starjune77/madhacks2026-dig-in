@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Game rules and state: scrap, shovel level, what a stroke does, memory objects. Sits on
+// Game rules and state: coins, the bag, spade level, what a stroke does, memory objects. Sits on
 // the "Game" object in SampleScene. Everything it talks to is real scene content wired up
 // in the inspector (DigIn/Build Scene does the first wiring); nothing is built here.
 public class DigGame : MonoBehaviour
@@ -12,7 +12,7 @@ public class DigGame : MonoBehaviour
     public static int AimMask { get; private set; } = Physics.DefaultRaycastLayers;
 
     // True while a card, letter or the ending is on screen.
-    public bool InputLocked => story != null && story.Locked;
+    public bool InputLocked => (story != null && story.Locked) || (shop != null && shop.IsOpen);
 
     public const int StratumCount = 3;
 
@@ -28,6 +28,10 @@ public class DigGame : MonoBehaviour
     public DigShovel shovel;
     public DigHud hud;
     public DigStory story;
+    public DigShop shop;
+    public DigMinerals minerals;
+    public DigAtmosphere atmosphere;
+    [Tooltip("The shop counter: walk up to it and press E.")]
     public Workbench workbench;
     public MemoryShelf shelf;
     public Transform spawnPoint;
@@ -46,11 +50,9 @@ public class DigGame : MonoBehaviour
     public MemoryData blankPage;
     public MemoryFind blankPagePrefab;
 
-    [Header("Shovels")]
-    public string[] shovelNames = { "Toy Shovel", "Garden Shovel", "Steel Shovel" };
-    [Tooltip("Scoop radius in the soft soil of the life path (m).")]
-    public float[] shovelRadius = { 0.5f, 0.6f, 0.7f };
-    public int[] upgradeCost = { 8, 20 };               // cost to reach level 1, level 2
+    [Header("Spades (names and prices are on the shop)")]
+    [Tooltip("Scoop radius in the soft soil of the life path, per spade level (m). A spade digs strata up to its level; the last one is just faster.")]
+    public float[] shovelRadius = { 0.5f, 0.56f, 0.62f, 0.74f };
 
     [Header("Soil")]
     [Tooltip("Soil is at its softest within the first distance of the life path and at its densest beyond the second (m).")]
@@ -58,19 +60,22 @@ public class DigGame : MonoBehaviour
     [Tooltip("Scoop size in dense soil, as a fraction of the soft-soil size.")]
     public float denseScale = 0.62f;
 
-    [Header("Scrap")]
-    [Tooltip("Cubic metres of earth dug per scrap found.")]
-    public float volumePerScrap = 1.2f;
-
     [Header("State")]
-    public int scrap;
+    public int coins;
     public int shovelLevel;
+    public int bagLevel;
+    public int lanternLevel;
+    public readonly System.Collections.Generic.List<MineralData> bag = new System.Collections.Generic.List<MineralData>();
+
+    public int BagCount => bag.Count;
+    public int BagValue { get { int v = 0; foreach (var m in bag) v += m.value; return v; } }
+    public float DeepestDepth { get; private set; }
+    public string ShovelName => shop != null ? shop.SpadeName : "Spade";
 
     bool[] spawned;
     bool[] found;
     bool pageSpawned;
     MemoryFind[] liveFinds;
-    float scrapProgress;
     int lastStratum;
     float lastAmount = 1f;
     bool tossPending;
@@ -123,7 +128,7 @@ public class DigGame : MonoBehaviour
         if (stratum > shovelLevel)
         {
             debris.Chips(hit.point, hit.normal, stratum);
-            hud.ShowMessage("This ground is too hard for the " + shovelNames[shovelLevel] + ".");
+            hud.ShowMessage("This ground is too hard for the " + ShovelName + ".");
             return DigOutcome.TooHard;
         }
 
@@ -150,17 +155,34 @@ public class DigGame : MonoBehaviour
 
     void ScoopDone(Vector3 center, float radius, float volumeRemoved)
     {
-        scrapProgress += volumeRemoved;
-        bool gained = false;
-        while (scrapProgress >= volumePerScrap)
-        {
-            scrapProgress -= volumePerScrap;
-            scrap++;
-            gained = true;
-        }
-        if (gained) hud.FlashScrap();
-
+        if (minerals != null) minerals.Freed(center, radius, player.transform.position - center);
         CheckFinds(center, radius);
+    }
+
+    // ---- The bag and the shop ---------------------------------------------------
+    // A loose mineral the player walked over. False (and a hint) when the bag is full.
+    public bool TryBag(MineralData kind)
+    {
+        int size = shop != null ? shop.BagSize : 6;
+        if (bag.Count >= size)
+        {
+            if (Time.time > bagFullHint) { hud.ShowMessage("Your bag is full. Press <b>R</b> to go up and sell.", 3f); bagFullHint = Time.time + 6f; }
+            return false;
+        }
+        bag.Add(kind);
+        hud.FlashScrap();
+        hud.ShowMessage("<b>" + kind.title + "</b>  <alpha=#BB><i>" + kind.line + "</i>", 3.5f);
+        return true;
+    }
+    float bagFullHint;
+
+    public int SellBag(out int count)
+    {
+        count = bag.Count;
+        int value = BagValue;
+        coins += value;
+        bag.Clear();
+        return value;
     }
 
     // The ring that shows where the next scoop will land.
@@ -271,6 +293,7 @@ public class DigGame : MonoBehaviour
         var points = new List<Vector3>();
         for (float d = 0f; d <= distance; d += 0.4f) points.Add(path.PointAt(d) + Vector3.up * 0.45f);
         volume.CarveTunnel(points, 1.05f);
+        if (minerals != null) foreach (var p in points) minerals.ClearInside(p, 1.3f);
     }
 
     void StandOnPath(float distance)
@@ -285,7 +308,7 @@ public class DigGame : MonoBehaviour
 
     void SetShovel(int level)
     {
-        shovelLevel = Mathf.Clamp(level, 0, shovelNames.Length - 1);
+        shovelLevel = Mathf.Clamp(level, 0, shovelRadius.Length - 1);
         shovel.SetLevel(shovelLevel);
     }
 
@@ -356,35 +379,19 @@ public class DigGame : MonoBehaviour
     }
 
     // ---- Surface ------------------------------------------------------------
-    // E key. Only does something at the workbench.
+    // E key. At the shop counter, opens the shop.
     public void Interact()
     {
-        if (workbench == null || !workbench.InRange(player.transform.position)) return;
-        if (shovelLevel >= shovelNames.Length - 1) return;
-
-        int cost = upgradeCost[shovelLevel];
-        if (scrap < cost)
-        {
-            hud.ShowMessage("Not enough scrap yet.", 2f);
-            return;
-        }
-
-        scrap -= cost;
-        shovelLevel++;
-        shovel.SetLevel(shovelLevel);
-        hud.ShowMessage("You now have the " + shovelNames[shovelLevel] + ".");
+        if (shop == null || workbench == null || !workbench.InRange(player.transform.position)) return;
+        shop.Open();
     }
 
-    string WorkbenchPrompt()
+    string ShopPrompt()
     {
-        if (workbench == null || !workbench.InRange(player.transform.position)) return null;
-        if (shovelLevel >= shovelNames.Length - 1) return "This is the best shovel you have.";
-
-        int cost = upgradeCost[shovelLevel];
-        string next = shovelNames[shovelLevel + 1];
-        return scrap >= cost
-            ? "Press <b>E</b> to make a " + next + "  <alpha=#99>(" + cost + " scrap)"
-            : "A " + next + " needs " + cost + " scrap  <alpha=#99>(you have " + scrap + ")";
+        if (shop == null || shop.IsOpen || workbench == null || !workbench.InRange(player.transform.position)) return null;
+        return bag.Count > 0
+            ? "Press <b>E</b> to see the cat  <alpha=#99>(" + bag.Count + " stones to sell)"
+            : "Press <b>E</b> to see the cat";
     }
 
     // R key: up to the surface from below, and back down to where you were from above.
@@ -417,8 +424,9 @@ public class DigGame : MonoBehaviour
         if (player.transform.position.y < DigVolume.Min.y - 3f) ReturnToSurface();
 
         float depth = Mathf.Max(0f, -player.FeetY);
-        int cost = shovelLevel < upgradeCost.Length ? upgradeCost[shovelLevel] : -1;
-        hud.SetStatus(depth, shovelNames[shovelLevel], scrap, cost);
-        hud.SetPrompt(WorkbenchPrompt());
+        DeepestDepth = Mathf.Max(DeepestDepth, depth);
+        hud.SetStatus(depth, ShovelName, coins, bag.Count, shop != null ? shop.BagSize : 6);
+        hud.SetPrompt(ShopPrompt());
+        if (atmosphere != null && shop != null) atmosphere.lanternPower = shop.LanternPower;
     }
 }

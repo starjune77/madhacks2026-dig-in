@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// The workbench at the surface where the shovel is upgraded. Walk up and press E.
+// The cat's shop counter at the surface (the Workbench prefab). Walk up and press E.
 public class Workbench : MonoBehaviour
 {
     [Tooltip("Where the player counts as 'at the bench'. Usually just in front of it.")]

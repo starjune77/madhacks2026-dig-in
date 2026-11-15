@@ -38,13 +38,13 @@ public static partial class DigInSceneBuilder
     const string HdriPath = "Assets/ThirdParty/PolyHaven/evening_field_2k.hdr";
 
     // Prefab version markers. Bump one to rebuild that prefab on the next run.
-    const string PlayerVersion = "v8 meshy spade";
+    const string PlayerVersion = "v9 four spades";
     const string FindVersion = "v5 polyhaven";
     const string ShelfVersion = "v4 meshy shelf";
     const string BenchVersion = "v3 meshy counter";
-    const string HudVersion = "v6 ending layout";
+    const string HudVersion = "v7 shop board";
     const string HubVersion = "v4 realistic";         // marker child of scene/Surface Hub
-    const string DigSiteVersion = "v8 grass";           // marker child of scene/Dig Site
+    const string DigSiteVersion = "v10 minerals";        // marker child of scene/Dig Site
     const string EnvVersion = "v7 realistic";         // marker child of scene/Environment
     const string PageVersion = "v1 page";
 
@@ -59,6 +59,8 @@ public static partial class DigInSceneBuilder
     static readonly Color InkColor = new Color(0.22f, 0.16f, 0.11f, 1f);
 
     static StringBuilder report;
+    static MineralData[] pendingMinerals;
+    static ParticleSystem pendingGlint;
 
     // ---- Entry point ---------------------------------------------------------
     [MenuItem("DigIn/Build Scene", false, 0)]
@@ -109,6 +111,8 @@ public static partial class DigInSceneBuilder
         var font = BuildFont("Lora-Regular");
         var italic = BuildFont("Lora-Italic");
         var feel = BuildFeelAssets();
+        pendingMinerals = BuildMinerals();
+        pendingGlint = BuildGlintPrefab(feel.dust);
 
         var rebuilt = new HashSet<string>();
         var playerPrefab = BuildPlayerPrefab(feel, rebuilt);
@@ -467,9 +471,9 @@ public static partial class DigInSceneBuilder
             ShovelModel("Toy Shovel", pivot, spade, 0.5f),
             ShovelModel("Garden Shovel", pivot, spade, 0.58f),
             ShovelModel("Steel Shovel", pivot, spade, 0.66f),
+            ShovelModel("Fine Steel Shovel", pivot, spade, 0.72f),
         };
-        shovel.models[1].SetActive(false);
-        shovel.models[2].SetActive(false);
+        for (int i = 1; i < shovel.models.Length; i++) shovel.models[i].SetActive(false);
 
         var blade = new GameObject("Blade").transform;
         blade.SetParent(pivot, false);
@@ -760,6 +764,7 @@ public static partial class DigInSceneBuilder
         c.characterSpacing = 2f;
 
         BuildCardUi(root.transform, hud, font, italic);
+        BuildShopUi(root.transform, hud, font, italic);
         BuildLetterUi(root.transform, hud, font, italic);
         BuildEndingUi(root.transform, hud, italic);
 
@@ -1027,6 +1032,7 @@ public static partial class DigInSceneBuilder
 
         BuildAimRing(feel).transform.SetParent(digSite, false);
         BuildYardGrass(volume).transform.SetParent(digSite, false);
+        BuildMineralField(volume, path, pendingMinerals, pendingGlint).transform.SetParent(digSite, false);
     }
 
     // The yard in front of the house's back door: spawn, memory shelf, workbench lean-to.
@@ -1064,6 +1070,8 @@ public static partial class DigInSceneBuilder
         if (atmosphere == null) atmosphere = gameRoot.gameObject.AddComponent<DigAtmosphere>();
         var story = gameRoot.GetComponent<DigStory>();
         if (story == null) story = gameRoot.gameObject.AddComponent<DigStory>();
+        var shop = gameRoot.GetComponent<DigShop>();
+        if (shop == null) shop = gameRoot.gameObject.AddComponent<DigShop>();
 
         var player = Find<DigPlayer>(scene);
         if (game.volume == null) game.volume = Find<DigVolume>(scene);
@@ -1071,6 +1079,10 @@ public static partial class DigInSceneBuilder
         if (game.scoops == null) game.scoops = Find<DigScoop>(scene);
         if (game.debris == null) game.debris = Find<DigDebris>(scene);
         if (game.aim == null) game.aim = Find<DigAim>(scene);
+        if (game.minerals == null) game.minerals = Find<DigMinerals>(scene);
+        if (game.shop == null) game.shop = shop;
+        if (game.atmosphere == null) game.atmosphere = atmosphere;
+        if (shop.game == null) shop.game = game;
         if (game.player == null) game.player = player;
         if (game.shovel == null && player != null) game.shovel = player.shovel;
         if (game.hud == null) game.hud = Find<DigHud>(scene);
@@ -1085,6 +1097,8 @@ public static partial class DigInSceneBuilder
         if (game.story == null) game.story = story;
         EditorUtility.SetDirty(game);
 
+        if (shop.hud == null) shop.hud = game.hud;
+        EditorUtility.SetDirty(shop);
         if (story.game == null) story.game = game;
         if (story.hud == null) story.hud = game.hud;
         if (story.letters == null || story.letters.Length == 0) story.letters = letters.Take(3).ToArray();

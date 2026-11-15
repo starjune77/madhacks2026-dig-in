@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caef213a6e5335e409f119e7d00b1d5c, type: 3}
+  m_Name: 04 Jasper
+  m_EditorClassIdentifier: Assembly-CSharp::MineralData
+  title: Jasper
+  line: Warm in the hand, like a pocket stone you never threw.
+  value: 8
+  weightByStratum: {x: 1.2, y: 1.5, z: 0.8}
+  model: {fileID: 919132149155446097, guid: 325ad13d8b105ed4d96a6cf5b6f97301, type: 3}
+  size: 0.14
+  glint: {r: 1, g: 0.75, b: 0.6, a: 1}

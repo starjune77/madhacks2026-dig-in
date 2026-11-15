@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caef213a6e5335e409f119e7d00b1d5c, type: 3}
+  m_Name: 02 Feldspar
+  m_EditorClassIdentifier: Assembly-CSharp::MineralData
+  title: Feldspar
+  line: Pink as a sunburn after a long day outside.
+  value: 4
+  weightByStratum: {x: 2.5, y: 1.5, z: 0.8}
+  model: {fileID: 919132149155446097, guid: a2dac0288c67bbf44864dafde00a8ef8, type: 3}
+  size: 0.14
+  glint: {r: 1, g: 0.85, b: 0.8, a: 1}

@@ -50,7 +50,7 @@ public static partial class DigInSceneBuilder
 
     // ---- Models ------------------------------------------------------------------------
     // A Meshy model: one material from its base colour and normal maps, nearly matte.
-    static GameObject MeshyAsset(string name, float smoothness = 0.2f)
+    static GameObject MeshyAsset(string name, float smoothness = 0.2f, float metallic = 0f)
     {
         string fbx = MeshyRoot + "/" + name + "/" + name + ".fbx";
         if (!File.Exists(fbx)) { report.AppendLine("  MISSING " + fbx); return null; }
@@ -63,7 +63,7 @@ public static partial class DigInSceneBuilder
             var nrm = ImportScan(texDir + "normal.png", TextureImporterType.NormalMap, false, 2048);
             if (nrm != null) { m.SetTexture("_BumpMap", nrm); m.EnableKeyword("_NORMALMAP"); }
             m.SetFloat("_Smoothness", smoothness);
-            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Metallic", metallic);
             m.enableInstancing = true;
             return m;
         });

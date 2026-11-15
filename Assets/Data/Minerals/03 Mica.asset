@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caef213a6e5335e409f119e7d00b1d5c, type: 3}
+  m_Name: 03 Mica
+  m_EditorClassIdentifier: Assembly-CSharp::MineralData
+  title: Mica
+  line: Thin layers, like the pages you meant to finish.
+  value: 5
+  weightByStratum: {x: 2, y: 1.5, z: 0.6}
+  model: {fileID: 919132149155446097, guid: 1845a087a2b1af94aa130093a5b57068, type: 3}
+  size: 0.14
+  glint: {r: 1, g: 0.95, b: 0.8, a: 1}

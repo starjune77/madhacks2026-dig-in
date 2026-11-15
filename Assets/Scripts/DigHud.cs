@@ -58,6 +58,11 @@ public class DigHud : MonoBehaviour
     [Tooltip("Full-screen black, for fading out and back in.")]
     public CanvasGroup fadeGroup;
 
+    [Header("The cat's shop")]
+    public CanvasGroup shopGroup;
+    public TMP_Text shopBoard;
+    public TMP_Text shopCat;
+
     [Header("Demo mode badge")]
     public CanvasGroup demoGroup;
 
@@ -68,6 +73,7 @@ public class DigHud : MonoBehaviour
     float messageTimer;
     bool promptVisible;
     bool cardVisible;
+    bool shopVisible;
     float time;
 
     void Awake()
@@ -80,6 +86,7 @@ public class DigHud : MonoBehaviour
         if (letter.group != null) letter.group.alpha = 0f;
         if (ending.group != null) ending.group.alpha = 0f;
         if (fadeGroup != null) fadeGroup.alpha = 0f;
+        if (shopGroup != null) shopGroup.alpha = 0f;
     }
 
     public void SetDemo(bool on)
@@ -93,13 +100,21 @@ public class DigHud : MonoBehaviour
         if (fadeGroup != null) fadeGroup.alpha = alpha;
     }
 
-    // upgradeCost < 0 means there is nothing left to upgrade to.
-    public void SetStatus(float depth, string shovelName, int scrap, int upgradeCost)
+    public void SetStatus(float depth, string shovelName, int coins, int bagCount, int bagSize)
     {
         if (depthText != null) depthText.text = depth.ToString("0.0") + " m";
         if (shovelText != null) shovelText.text = shovelName;
-        if (scrapText != null)
-            scrapText.text = upgradeCost >= 0 ? scrap + " / " + upgradeCost + " scrap" : scrap + " scrap";
+        if (scrapText != null) scrapText.text = coins + " coins    <alpha=#AA>bag " + bagCount + " / " + bagSize;
+    }
+
+    // The cat's price board. `board` and `catLine` are rich text; null hides it.
+    public void ShowShop(bool visible, string board, string catLine)
+    {
+        shopVisible = visible;
+        if (!visible) return;
+        if (shopBoard != null) shopBoard.text = board;
+        if (shopCat != null) shopCat.text = "\u201C" + catLine + "\u201D";
+        messageTimer = 0f;
     }
 
     public void FlashScrap()
@@ -186,6 +201,7 @@ public class DigHud : MonoBehaviour
         Fade(promptGroup, promptVisible);
         Fade(controlsGroup, time < controlsSeconds, 0.5f);
         Fade(cardGroup, cardVisible, 1.5f);
+        Fade(shopGroup, shopVisible, 2f);
         Fade(letter.group, letter.visible, 0.6f);
         Fade(ending.group, ending.visible, 0.35f);
         if (cardPanel != null && cardVisible)

@@ -29,6 +29,9 @@ public class DigAtmosphere : MonoBehaviour
     public float lanternSurfaceIntensity = 0f;
     public float lanternDeepIntensity = 2.2f;
     public float flicker = 0.08f;
+    [Tooltip("Set by the game from the shop's lantern upgrades: multiplies brightness and reach.")]
+    public float lanternPower = 1f;
+    float baseRange;
 
     Color surfaceSky, surfaceEquator, surfaceGround, surfaceFog;
     float surfaceFogDensity, surfaceSunIntensity, surfaceAmbient, surfaceReflection;
@@ -65,7 +68,9 @@ public class DigAtmosphere : MonoBehaviour
         {
             float n = Mathf.PerlinNoise(Time.time * 3f, 0.37f) - 0.5f;
             float lanternT = Mathf.Clamp01(depth / 2.5f);   // lantern comes up quickly once in the hole
-            lantern.intensity = Mathf.Lerp(lanternSurfaceIntensity, lanternDeepIntensity, lanternT) * (1f + n * flicker);
+            if (baseRange <= 0f) baseRange = lantern.range;
+            lantern.range = baseRange * Mathf.Sqrt(lanternPower);
+            lantern.intensity = Mathf.Lerp(lanternSurfaceIntensity, lanternDeepIntensity * lanternPower, lanternT) * (1f + n * flicker);
             lantern.enabled = lantern.intensity > 0.01f;
         }
     }
